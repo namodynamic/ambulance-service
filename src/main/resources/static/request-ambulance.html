@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Ambulance</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Request Emergency Ambulance</h1>
+        
+        <div id="message" class="alert" style="display: none;"></div>
+        
+        <div class="form-container">
+            <form id="requestForm">
+                <div class="form-group">
+                    <label for="userName">Your Name:</label>
+                    <input type="text" id="userName" name="userName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="userContact">Contact Number:</label>
+                    <input type="tel" id="userContact" name="userContact" 
+                           pattern="[0-9]{10}" placeholder="10 digit number" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="location">Emergency Location:</label>
+                    <textarea id="location" name="location" rows="3" 
+                              placeholder="Please provide detailed address" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" class="btn btn-emergency">
+                        Request Ambulance Now
+                    </button>
+                </div>
+            </form>
+            
+            <div class="back-link">
+                <a href="/">← Back to Home</a>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/js/request.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Ambulance Service Admin Dashboard</h1>
+        
+        <div id="message" class="alert" style="display: none;"></div>
+        
+        <div class="dashboard-section">
+            <h2>Ambulance Fleet Status</h2>
+            <div id="ambulanceList" class="loading">Loading...</div>
+        </div>
+        
+        <div class="dashboard-section">
+            <h2>Pending Requests</h2>
+            <div id="pendingRequests" class="loading">Loading...</div>
+        </div>
+        
+        <div class="dashboard-section">
+            <h2>All Requests History</h2>
+            <div id="allRequests" class="loading">Loading...</div>
+        </div>
+        
+        <div class="back-link">
+            <a href="/">← Back to Home</a>
+        </div>
+    </div>
+    
+    <script src="/js/admin.js"></script>
+</body>
+</html>
