@@ -60,6 +60,8 @@ build/
 ### VS Code ###
 .vscode/
 
+.env
+
 # OS
 .DS_Store
 Thumbs.db
