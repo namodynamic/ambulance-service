@@ -1,6 +1,7 @@
 package com.ambulance.ambulance_service.controller;
 
 import com.ambulance.ambulance_service.entity.Ambulance;
+import com.ambulance.ambulance_service.entity.AvailabilityStatus;
 import com.ambulance.ambulance_service.service.AmbulanceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,12 +41,12 @@ public class AmbulanceControllerTest {
         ambulance1 = new Ambulance();
         ambulance1.setId(1L);
         ambulance1.setCurrentLocation("Location A");
-        ambulance1.setAvailability(true);
+        ambulance1.setAvailability(AvailabilityStatus.AVAILABLE);
 
         ambulance2 = new Ambulance();
         ambulance2.setId(2L);
         ambulance2.setCurrentLocation("Location B");
-        ambulance2.setAvailability(false);
+        ambulance2.setAvailability(AvailabilityStatus.OUT_OF_SERVICE);
     }
 
     @Test
