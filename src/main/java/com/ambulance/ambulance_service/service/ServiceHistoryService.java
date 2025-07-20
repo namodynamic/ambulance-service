@@ -25,6 +25,7 @@ public class ServiceHistoryService {
 
     public ServiceHistory createServiceHistory(Request request, Patient patient, Ambulance ambulance) {
         ServiceHistory serviceHistory = new ServiceHistory(request, patient, ambulance);
+        serviceHistory.setStatus(ServiceStatus.IN_PROGRESS);
         return serviceHistoryRepository.save(serviceHistory);
     }
 

@@ -15,4 +15,6 @@ public interface AmbulanceRepository extends JpaRepository<Ambulance, Long> {
 
     @Query("SELECT a FROM Ambulance a WHERE a.availability = 'AVAILABLE' ORDER BY a.id LIMIT 1")
     Optional<Ambulance> findFirstAvailableAmbulance();
+
+    Optional<Ambulance> findFirstByAvailability(AvailabilityStatus availabilityStatus);
 }

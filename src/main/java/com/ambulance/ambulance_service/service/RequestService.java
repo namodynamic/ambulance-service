@@ -6,6 +6,7 @@ import com.ambulance.ambulance_service.exception.NoAvailableAmbulanceException;
 import com.ambulance.ambulance_service.exception.RequestNotFoundException;
 import com.ambulance.ambulance_service.repository.RequestRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 @Service
 public class RequestService {
+    private static final int MAX_RETRIES = 3;
 
     @Autowired
     private RequestRepository requestRepository;
@@ -37,8 +39,26 @@ public class RequestService {
     }
 
     @Transactional
-    public Request createRequest(AmbulanceRequestDto ambulanceRequestDto) throws NoAvailableAmbulanceException {
-        // Create new request
+    public Request createRequest(AmbulanceRequestDto ambulanceRequestDto)
+            throws NoAvailableAmbulanceException {
+
+        int attempt = 0;
+        while (attempt < MAX_RETRIES) {
+            try {
+                return createRequestTransaction(ambulanceRequestDto);
+            } catch (ObjectOptimisticLockingFailureException ex) {
+                attempt++;
+                if (attempt >= MAX_RETRIES) {
+                    throw new NoAvailableAmbulanceException(
+                            "Could not assign ambulance after " + MAX_RETRIES + " attempts due to high demand");
+                }
+                // Log and retry
+            }
+        }
+        throw new NoAvailableAmbulanceException("No ambulance available");
+    }
+
+    private Request createRequestTransaction(AmbulanceRequestDto ambulanceRequestDto) throws NoAvailableAmbulanceException {
         Request request = new Request(
                 ambulanceRequestDto.getUserName(),
                 ambulanceRequestDto.getUserContact(),
@@ -57,9 +77,6 @@ public class RequestService {
             request.setStatus(RequestStatus.DISPATCHED);
             request.setDispatchTime(LocalDateTime.now());
 
-            // Update ambulance status
-            ambulanceService.updateAmbulanceStatus(ambulance.getId(), AvailabilityStatus.DISPATCHED);
-
             // Create or find patient
             Patient patient = patientService.findOrCreatePatient(
                     ambulanceRequestDto.getUserName(),
@@ -75,7 +92,9 @@ public class RequestService {
         }
     }
 
-    public Request updateRequestStatus(Long requestId, RequestStatus status) throws RequestNotFoundException {
+    public Request updateRequestStatus(Long requestId, RequestStatus status)
+            throws RequestNotFoundException {
+
         Optional<Request> requestOpt = requestRepository.findById(requestId);
         if (requestOpt.isPresent()) {
             Request request = requestOpt.get();

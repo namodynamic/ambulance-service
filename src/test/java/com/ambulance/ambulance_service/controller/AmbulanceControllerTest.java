@@ -56,7 +56,7 @@ public class AmbulanceControllerTest {
 
         // Act & Assert
         mockMvc.perform(get("/api/ambulances")
-                .contentType(MediaType.APPLICATION_JSON))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].id", is(1)))
@@ -74,11 +74,11 @@ public class AmbulanceControllerTest {
 
         // Act & Assert
         mockMvc.perform(get("/api/ambulances/available")
-                .contentType(MediaType.APPLICATION_JSON))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].availability", is(true)));
+                .andExpect(jsonPath("$[0].availability", is("AVAILABLE")));
 
         verify(ambulanceService, times(1)).getAvailableAmbulances();
     }

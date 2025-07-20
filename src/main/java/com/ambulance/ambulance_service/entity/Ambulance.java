@@ -11,6 +11,9 @@ public class Ambulance {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @NotNull
     @Column(name = "current_location")
     private String currentLocation;

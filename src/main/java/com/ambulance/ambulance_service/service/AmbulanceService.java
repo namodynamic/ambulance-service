@@ -5,6 +5,7 @@ import com.ambulance.ambulance_service.entity.AvailabilityStatus;
 import com.ambulance.ambulance_service.repository.AmbulanceRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -55,7 +56,38 @@ public class AmbulanceService {
     }
 
     public Optional<Ambulance> getNextAvailableAmbulance() {
-        return ambulanceRepository.findFirstAvailableAmbulance();
+        Ambulance ambulance;
+        while ((ambulance = availableQueue.poll()) != null) {
+            try {
+                // Re-check availability against database
+                Optional<Ambulance> currentOpt = ambulanceRepository.findById(ambulance.getId());
+                if (currentOpt.isPresent()) {
+                    Ambulance current = currentOpt.get();
+                    if (current.getAvailability() == AvailabilityStatus.AVAILABLE) {
+                        // Update status and save
+                        current.setAvailability(AvailabilityStatus.DISPATCHED);
+                        Ambulance updated = ambulanceRepository.save(current);
+                        ambulanceCache.put(updated.getId(), updated);
+                        return Optional.of(updated);
+                    }
+                }
+            } catch (ObjectOptimisticLockingFailureException ex) {
+                // Retry with next ambulance
+                continue;
+            }
+        }
+
+        // If queue is empty, try to find one directly from DB
+        Optional<Ambulance> dbAmbulance = ambulanceRepository.findFirstByAvailability(AvailabilityStatus.AVAILABLE);
+        if (dbAmbulance.isPresent()) {
+            Ambulance found = dbAmbulance.get();
+            found.setAvailability(AvailabilityStatus.DISPATCHED);
+            ambulanceRepository.save(found);
+            ambulanceCache.put(found.getId(), found);
+            return Optional.of(found);
+        }
+
+        return Optional.empty();
     }
 
     public void updateAmbulanceStatus(Long ambulanceId, AvailabilityStatus status) {

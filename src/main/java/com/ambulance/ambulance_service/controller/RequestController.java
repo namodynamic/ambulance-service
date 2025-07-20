@@ -8,10 +8,15 @@ import com.ambulance.ambulance_service.exception.RequestNotFoundException;
 import com.ambulance.ambulance_service.service.RequestService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -35,10 +40,20 @@ public class RequestController {
     }
 
     @PostMapping
-    public ResponseEntity<Request> createRequest(@Valid @RequestBody AmbulanceRequestDto requestDto) {
+    public ResponseEntity<?> createRequest(@Valid @RequestBody AmbulanceRequestDto requestDto, BindingResult bindingResult) {
+        if (bindingResult.hasErrors()) {
+            return handleValidationErrors(bindingResult);
+        }
+
         try {
             Request request = requestService.createRequest(requestDto);
             return ResponseEntity.ok(request);
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof NoAvailableAmbulanceException) {
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body(Map.of("error", e.getCause().getMessage()));
+            }
+            throw e;
         } catch (NoAvailableAmbulanceException e) {
             throw new RuntimeException(e);
         }
@@ -55,6 +70,7 @@ public class RequestController {
         }
     }
 
+
     @GetMapping("/status/{status}")
     public List<Request> getRequestsByStatus(@PathVariable RequestStatus status) {
         return requestService.getRequestsByStatus(status);
@@ -63,5 +79,13 @@ public class RequestController {
     @GetMapping("/pending")
     public List<Request> getPendingRequests() {
         return requestService.getPendingRequests();
+    }
+
+    private ResponseEntity<Map<String, String>> handleValidationErrors(BindingResult bindingResult) {
+        Map<String, String> errors = new HashMap<>();
+        for (FieldError error : bindingResult.getFieldErrors()) {
+            errors.put(error.getField(), error.getDefaultMessage());
+        }
+        return ResponseEntity.badRequest().body(errors);
     }
 }

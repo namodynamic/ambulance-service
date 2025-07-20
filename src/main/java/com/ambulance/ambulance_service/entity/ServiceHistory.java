@@ -36,11 +36,11 @@ public class ServiceHistory {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
-    protected void onCreate() {
+    public void onCreate() {
         createdAt = LocalDateTime.now();
         status = ServiceStatus.IN_PROGRESS;
     }
@@ -52,6 +52,8 @@ public class ServiceHistory {
         this.request = request;
         this.patient = patient;
         this.ambulance = ambulance;
+        this.status = ServiceStatus.IN_PROGRESS;
+        this.createdAt = LocalDateTime.now();
     }
 
     // Getters and Setters
