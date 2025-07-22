@@ -1,115 +1,161 @@
-// Check if user is logged in and has the correct role for the current page
-function checkAuth() {
-    const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
-    const currentPath = window.location.pathname;
+    // Auth module for handling authentication
 
-    // If no token and not on login/register page, redirect to login
-    if (!token && !['/login.html', '/register.html', '/'].includes(currentPath)) {
-        window.location.href = '/login.html';
-        return false;
-    }
+// Store the original showPage function
+const originalShowPage = window.showPage;
 
-    // If user is on admin dashboard but not an admin/dispatcher, redirect
-    if (currentPath === '/admin-dashboard.html' && !['ROLE_ADMIN', 'ROLE_DISPATCHER'].includes(role)) {
-        window.location.href = role ? '/request-ambulance.html' : '/login.html';
-        return false;
-    }
+// Override showPage to handle auth checks
+window.showPage = function(pageId) {
+  console.log(`Auth: Showing page ${pageId}`);
 
-    // If user is on request-ambulance page but not logged in, redirect to login
-    if (currentPath === '/request-ambulance.html' && !token) {
-        window.location.href = '/login.html';
-        return false;
-    }
+  // Check for protected pages
+  const protectedPages = ['admin-dashboard', 'profile'];
+  const isProtected = protectedPages.includes(pageId);
 
-    // If token exists and user is on login/register page, redirect based on role
-    if (token && ['/login.html', '/register.html', '/', '/index.html'].includes(currentPath)) {
-        if (role === 'ROLE_ADMIN' || role === 'ROLE_DISPATCHER') {
-            window.location.href = '/admin-dashboard.html';
-        } else {
-            window.location.href = '/request-ambulance.html';
-        }
-    }
+  // Check authentication status
+  const isAuthenticated = checkAuthStatus();
 
-    return !!token;
-}
-
-// Add auth header to API calls
-function getAuthHeader() {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        window.location.href = '/login.html';
-        return {};
-    }
-    return { 'Authorization': 'Bearer ' + token };
-}
-
-// Handle login form
-if (document.getElementById('loginForm')) {
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const loginData = {
-            username: document.getElementById('username').value,
-            password: document.getElementById('password').value
-        };
-
-        try {
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(loginData)
-            });
-
-            const messageDiv = document.getElementById('message');
-
-            if (response.ok) {
-                const data = await response.json();
-
-                // Store token and user info
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('username', data.username);
-                localStorage.setItem('role', data.role);
-
-                messageDiv.className = 'alert alert-success';
-                messageDiv.textContent = 'Login successful! Redirecting...';
-                messageDiv.style.display = 'block';
-
-                // Redirect based on role
-                setTimeout(() => {
-                    if (data.role === 'ROLE_ADMIN' || data.role === 'ROLE_DISPATCHER') {
-                        window.location.href = '/admin-dashboard.html';
-                    } else {
-                        window.location.href = '/request-ambulance.html';
-                    }
-                }, 1000);
-            } else {
-                const error = await response.json();
-                messageDiv.className = 'alert alert-error';
-                messageDiv.textContent = error.error || 'Login failed';
-                messageDiv.style.display = 'block';
-            }
-        } catch (error) {
-            const messageDiv = document.getElementById('message');
-            messageDiv.className = 'alert alert-error';
-            messageDiv.textContent = 'Network error: ' + error.message;
-            messageDiv.style.display = 'block';
-        }
-    });
-}
-
-// Logout function
-function logout() {
-    // Clear all auth data
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('role');
-
+  if (isProtected && !isAuthenticated) {
+    console.log('Auth: Redirecting to login');
     // Redirect to login page
-    window.location.href = '/login.html';
+    if (originalShowPage) {
+      originalShowPage('login');
+    } else {
+      console.error('Original showPage function not found');
+    }
+    return;
+  }
+
+  // Handle admin dashboard initialization
+  if (pageId === 'admin-dashboard' && isAuthenticated) {
+    // Check if user has admin role
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userRole = user.role || '';
+
+    // Check for both 'ADMIN' and 'ROLE_ADMIN' role formats
+    if (userRole !== 'ADMIN' && !userRole.endsWith('_ADMIN')) {
+      console.error('Access denied: Admin role required');
+      showNotification('Access denied: Admin privileges required', 'error');
+      return;
+    }
+
+    // Initialize admin dashboard if functions are available
+    if (typeof initializeAdminDashboard === 'function') {
+      // Call the original showPage first
+      if (originalShowPage) {
+        originalShowPage(pageId);
+      }
+
+      // Then initialize the admin dashboard
+      setTimeout(() => {
+        initializeAdminDashboard();
+      }, 0);
+      return;
+    } else {
+      console.error('Admin functions not loaded');
+      showNotification('Error loading admin interface', 'error');
+      return;
+    }
+  }
+
+  // For all other pages, use the original showPage
+  if (originalShowPage) {
+    originalShowPage(pageId);
+  } else {
+    console.error('Original showPage function not found');
+  }
+};
+
+// Check if user is authenticated
+function checkAuthStatus() {
+  const token = localStorage.getItem('token');
+  if (!token) return false;
+
+  // TODO: Add token validation/expiration check
+  return true;
 }
 
-// Run checkAuth when the page loads
-document.addEventListener('DOMContentLoaded', checkAuth);
+// Handle login form submission
+function handleLogin(event) {
+  event.preventDefault();
+
+  const form = event.target;
+  const formData = new FormData(form);
+  const credentials = {
+    email: formData.get('email'),
+    password: formData.get('password')
+  };
+
+  // Call your authentication API here
+  console.log('Login attempt with:', credentials);
+
+  // For demo purposes, simulate successful login
+  setTimeout(() => {
+    const mockUser = {
+      id: '123',
+      email: credentials.email,
+      name: 'Admin User',
+      role: 'ADMIN'
+    };
+
+    localStorage.setItem('token', 'mock-jwt-token');
+    localStorage.setItem('user', JSON.stringify(mockUser));
+
+    showNotification('Login successful!', 'success');
+
+    // Redirect to dashboard
+    if (typeof showPage === 'function') {
+      showPage('admin-dashboard');
+    } else {
+      window.location.href = 'index.html#admin-dashboard';
+    }
+  }, 500);
+}
+
+// Handle logout
+function handleLogout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+
+  // Redirect to home page
+  if (typeof showPage === 'function') {
+    showPage('home');
+  } else {
+    window.location.href = 'index.html';
+  }
+}
+
+// Initialize auth module
+function initAuth() {
+  console.log('Auth module initialized');
+
+  // Add event listeners
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', handleLogin);
+  }
+
+  const logoutButtons = document.querySelectorAll('.logout-btn');
+  logoutButtons.forEach(button => {
+    button.addEventListener('click', handleLogout);
+  });
+
+  // Check auth status on page load
+  if (checkAuthStatus()) {
+    console.log('User is authenticated');
+    // Update UI for authenticated user
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userElements = document.querySelectorAll('.user-name');
+    userElements.forEach(el => {
+      el.textContent = user.name || 'User';
+    });
+  } else {
+    console.log('User is not authenticated');
+  }
+}
+
+// Initialize auth when DOM is loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAuth);
+} else {
+  initAuth();
+}

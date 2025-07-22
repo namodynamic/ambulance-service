@@ -50,27 +50,33 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints - allow access to all static resources and HTML pages
+                        // Public static resources - allow all
                         .requestMatchers(
-                                "/", 
-                                "/index.html", 
-                                "/login.html",
-                                "/register.html",
-                                "/admin-dashboard.html",
-                                "/request-ambulance.html",
-                                "/css/**", 
+                                "/",
+                                "/index.html",
+                                "/css/**",
                                 "/js/**",
                                 "/images/**",
-                                "/favicon.ico"
+                                "/favicon.ico",
+                                "/error"
                         ).permitAll()
-                        
-                        // Public API endpoints
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/api-docs/**").permitAll()
 
-                        // Protected API endpoints with proper role prefixes
-                        .requestMatchers("/api/requests").hasAnyRole("USER", "ADMIN", "DISPATCHER")
+                        // Public API endpoints - no authentication required
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/debug/**").permitAll()
+
+                        // Swagger/OpenAPI documentation
+                        .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**").permitAll()
+
+                        // Emergency request endpoint - allow public access for emergencies
+                        .requestMatchers("/api/requests").permitAll()
+
+                        // Protected API endpoints with role-based access
+                        .requestMatchers("/api/requests/**").hasAnyRole("USER", "ADMIN", "DISPATCHER")
                         .requestMatchers("/api/dispatch/**").hasAnyRole("DISPATCHER", "ADMIN")
+                        .requestMatchers("/api/ambulances/**").hasAnyRole("DISPATCHER", "ADMIN")
+                        .requestMatchers("/api/patients/**").hasAnyRole("DISPATCHER", "ADMIN")
+                        .requestMatchers("/api/service-history/**").hasAnyRole("DISPATCHER", "ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         // All other requests need authentication

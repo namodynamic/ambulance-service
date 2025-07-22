@@ -1,11 +1,14 @@
 package com.ambulance.ambulance_service.entity;
 
+import com.fasterxml.jackson.annotation.*;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "ambulances")
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Ambulance {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

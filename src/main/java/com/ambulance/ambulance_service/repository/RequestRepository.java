@@ -14,4 +14,5 @@ public interface RequestRepository extends JpaRepository<Request, Long> {
     List<Request> findByRequestTimeBetween(LocalDateTime start, LocalDateTime end);
     List<Request> findByUserContact(String userContact);
     List<Request> findAllByOrderByRequestTimeDesc();
+    List<Request> findByStatusOrderByRequestTimeAsc(RequestStatus status);
 }

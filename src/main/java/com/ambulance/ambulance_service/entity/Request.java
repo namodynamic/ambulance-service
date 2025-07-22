@@ -1,12 +1,17 @@
 package com.ambulance.ambulance_service.entity;
 
+import com.fasterxml.jackson.annotation.*;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "requests")
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Request {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,10 +40,15 @@ public class Request {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ambulance_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Ambulance ambulance;
 
     @Enumerated(EnumType.STRING)
     private RequestStatus status;
+
+    @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    private List<RequestStatusHistory> statusHistory = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
@@ -83,4 +93,38 @@ public class Request {
 
     public RequestStatus getStatus() { return status; }
     public void setStatus(RequestStatus status) { this.status = status; }
+
+    /**
+     * Updates the status of the request and records the change in history
+     * @param newStatus The new status to set
+     * @param changedBy The username of the user making the change
+     * @param notes Optional notes about the status change
+     */
+    public void updateStatus(RequestStatus newStatus, String changedBy, String notes) {
+        RequestStatus oldStatus = this.status;
+        this.status = newStatus;
+        
+        // Record the status change in history
+        RequestStatusHistory history = new RequestStatusHistory(
+            this, 
+            oldStatus, 
+            newStatus, 
+            notes, 
+            changedBy
+        );
+        this.statusHistory.add(history);
+        
+        // Update dispatch time if being dispatched
+        if (newStatus == RequestStatus.DISPATCHED && this.dispatchTime == null) {
+            this.dispatchTime = LocalDateTime.now();
+        }
+    }
+    
+    public List<RequestStatusHistory> getStatusHistory() {
+        return statusHistory;
+    }
+    
+    public void setStatusHistory(List<RequestStatusHistory> statusHistory) {
+        this.statusHistory = statusHistory;
+    }
 }
