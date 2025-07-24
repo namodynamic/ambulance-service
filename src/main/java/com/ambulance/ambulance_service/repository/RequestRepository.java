@@ -40,9 +40,15 @@ public interface RequestRepository extends JpaRepository<Request, Long> {
     // Find requests by user (authenticated users)
     Page<Request> findByUser(User user, Pageable pageable);
     
+    // Find requests by user, ordered by request time (newest first)
+    List<Request> findByUserOrderByRequestTimeDesc(User user);
+    
     // Find requests by user and status list (for active/history views)
     Page<Request> findByUserAndStatusIn(User user, List<RequestStatus> statuses, Pageable pageable);
     
+    // Find requests by user and status list, ordered by request time (newest first)
+    List<Request> findByUserAndStatusInOrderByRequestTimeDesc(User user, List<RequestStatus> statuses);
+
     // Existing methods for backward compatibility with contact-based queries
     Page<Request> findByUserContact(String userContact, Pageable pageable);
     Page<Request> findByUserContactAndStatusIn(String userContact, List<RequestStatus> statuses, Pageable pageable);

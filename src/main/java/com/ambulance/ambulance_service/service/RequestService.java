@@ -9,6 +9,8 @@ import com.ambulance.ambulance_service.repository.RequestStatusHistoryRepository
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -265,5 +268,60 @@ public class RequestService {
 
     public Request updateRequest(Request request) {
         return requestRepository.save(request);
+    }
+
+    /**
+     * Get all requests for a specific user
+     * @param user The user to get requests for
+     * @return List of user's requests, ordered by request time (newest first)
+     */
+    @Transactional(readOnly = true)
+    public List<Request> getRequestsByUser(User user) {
+        return requestRepository.findByUserOrderByRequestTimeDesc(user);
+    }
+    
+    /**
+     * Get active requests for a specific user
+     * Active requests are those that are not completed or cancelled
+     * @param user The user to get active requests for
+     * @return List of user's active requests, ordered by request time (newest first)
+     */
+    @Transactional(readOnly = true)
+    public List<Request> getActiveRequestsByUser(User user) {
+        List<RequestStatus> activeStatuses = Arrays.asList(
+            RequestStatus.PENDING,
+            RequestStatus.DISPATCHED,
+            RequestStatus.IN_PROGRESS,
+            RequestStatus.ARRIVED
+        );
+        return requestRepository.findByUserAndStatusInOrderByRequestTimeDesc(user, activeStatuses);
+    }
+
+    /**
+     * Get all requests for a specific user with pagination
+     * @param user The user to get requests for
+     * @param pageable Pagination information
+     * @return Page of user's requests
+     */
+    @Transactional(readOnly = true)
+    public Page<Request> getUserRequests(User user, Pageable pageable) {
+        return requestRepository.findByUser(user, pageable);
+    }
+    
+    /**
+     * Get active requests for a specific user with pagination
+     * @param user The user to get active requests for
+     * @param pageable Pagination information
+     * @return Page of user's active requests
+     */
+    @Transactional(readOnly = true)
+    public Page<Request> getActiveUserRequests(User user, Pageable pageable) {
+        List<RequestStatus> activeStatuses = Arrays.asList(
+            RequestStatus.PENDING,
+            RequestStatus.DISPATCHED,
+            RequestStatus.IN_PROGRESS,
+            RequestStatus.ARRIVED
+        );
+        return requestRepository.findByUserAndStatusIn(user, activeStatuses, pageable);
     }
 }

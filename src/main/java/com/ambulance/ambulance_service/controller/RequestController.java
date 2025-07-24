@@ -150,6 +150,52 @@ public class RequestController {
         return requestService.getPendingRequests();
     }
 
+    @GetMapping("/user/history")
+    public ResponseEntity<?> getUserRequestHistory(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Authentication required"));
+            }
+
+            org.springframework.security.core.userdetails.User principal = 
+                (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
+            
+            com.ambulance.ambulance_service.entity.User user = userRepository.findByUsername(principal.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            List<Request> userRequests = requestService.getRequestsByUser(user);
+            return ResponseEntity.ok(userRequests);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to fetch user request history: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/user/active")
+    public ResponseEntity<?> getUserActiveRequests(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Authentication required"));
+            }
+
+            org.springframework.security.core.userdetails.User principal = 
+                (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
+            
+            com.ambulance.ambulance_service.entity.User user = userRepository.findByUsername(principal.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            List<Request> activeRequests = requestService.getActiveRequestsByUser(user);
+            return ResponseEntity.ok(activeRequests);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to fetch active requests: " + e.getMessage()));
+        }
+    }
+
     private ResponseEntity<Map<String, String>> handleValidationErrors(BindingResult bindingResult) {
         Map<String, String> errors = new HashMap<>();
         for (FieldError error : bindingResult.getFieldErrors()) {
