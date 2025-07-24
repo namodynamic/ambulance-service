@@ -15,6 +15,9 @@ const API_BASE = '/api'
 function showPage(pageId) {
   console.log(`Switching to page: ${pageId}`)
 
+  // Update URL hash
+  window.location.hash = pageId;
+
   // Hide all pages
   document.querySelectorAll(".page").forEach((page) => {
     page.classList.remove("active")
@@ -968,3 +971,30 @@ style.textContent = `
   }
 `
 document.head.appendChild(style)
+
+// Handle initial page load and hash changes
+window.addEventListener('load', () => {
+  // Check for hash on load
+  const hash = window.location.hash.substring(1);
+  if (hash) {
+    showPage(hash);
+  } else if (localStorage.getItem('token')) {
+    // If logged in but no hash, go to appropriate dashboard
+    const userRole = localStorage.getItem('role');
+    if (userRole && (userRole.includes('ADMIN') || userRole.includes('DISPATCHER'))) {
+      showPage('admin-dashboard');
+    } else {
+      showPage('user-dashboard');
+    }
+  } else {
+    showPage('landing-page');
+  }
+});
+
+// Handle hash changes
+window.addEventListener('hashchange', () => {
+  const hash = window.location.hash.substring(1);
+  if (hash) {
+    showPage(hash);
+  }
+});

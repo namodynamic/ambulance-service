@@ -17,18 +17,22 @@ public class User {
     @JsonIgnore // Don't expose password in JSON responses
     private String password;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String role; // ROLE_USER, ROLE_ADMIN, ROLE_DISPATCHER
+    private Role role;
 
     @Column(nullable = false)
     private String email;
 
+    @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean enabled = true;
 
     // Constructors
-    public User() {}
+    public User() {
+        this.enabled = true;
+    }
 
-    public User(String username, String password, String role, String email) {
+    public User(String username, String password, Role role, String email) {
         this.username = username;
         this.password = password;
         this.role = role;
@@ -61,11 +65,11 @@ public class User {
         this.password = password;
     }
 
-    public String getRole() {
+    public Role getRole() {
         return role;
     }
 
-    public void setRole(String role) {
+    public void setRole(Role role) {
         this.role = role;
     }
 

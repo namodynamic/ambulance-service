@@ -3,6 +3,8 @@ package com.ambulance.ambulance_service.performance;
 import com.ambulance.ambulance_service.dto.AmbulanceRequestDto;
 import com.ambulance.ambulance_service.entity.Ambulance;
 import com.ambulance.ambulance_service.entity.AvailabilityStatus;
+import com.ambulance.ambulance_service.entity.Role;
+import com.ambulance.ambulance_service.entity.User;
 import com.ambulance.ambulance_service.service.AmbulanceService;
 import com.ambulance.ambulance_service.service.RequestService;
 import com.ambulance.ambulance_service.exception.NoAvailableAmbulanceException;
@@ -29,8 +31,15 @@ class PerformanceTest {
     @Autowired
     private RequestService requestService;
 
+    private User testUser;
+
     @BeforeEach
     void setUp() {
+        // Create a test user
+        testUser = new User();
+        testUser.setId(1L);
+        testUser.setRole(Role.USER);
+        
         // Create multiple ambulances for load testing
         for (int i = 1; i <= 10; i++) {
             ambulanceService.saveAmbulance(new Ambulance("Hospital " + i, AvailabilityStatus.AVAILABLE));
@@ -53,19 +62,16 @@ class PerformanceTest {
                 try {
                     for (int j = 0; j < requestsPerThread; j++) {
                         try {
-                            // Generate unique phone number for each request
-                            String uniquePhone = String.format("+15555%03d%03d",
-                                    threadId, j + System.currentTimeMillis() % 1000);
-
-                            AmbulanceRequestDto request = new AmbulanceRequestDto(
+                            AmbulanceRequestDto requestDto = new AmbulanceRequestDto(
                                     "Patient " + threadId + "-" + j,
-                                    uniquePhone,
+                                    "+12345678" + threadId + j,
                                     "Location " + threadId + "-" + j,
                                     "Emergency " + threadId + "-" + j
                             );
-                            requestService.createRequest(request);
+                            requestService.createRequest(requestDto, testUser);
                             successCount.incrementAndGet();
                         } catch (NoAvailableAmbulanceException e) {
+                            // Expected in some cases due to concurrency
                             failureCount.incrementAndGet();
                         } catch (Exception e) {
                             // Catch any other exceptions to prevent thread death

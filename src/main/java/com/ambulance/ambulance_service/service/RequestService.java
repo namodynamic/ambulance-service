@@ -6,6 +6,8 @@ import com.ambulance.ambulance_service.exception.NoAvailableAmbulanceException;
 import com.ambulance.ambulance_service.exception.RequestNotFoundException;
 import com.ambulance.ambulance_service.repository.RequestRepository;
 import com.ambulance.ambulance_service.repository.RequestStatusHistoryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,6 +23,8 @@ import java.util.Optional;
 @Service
 public class RequestService {
     private static final int MAX_RETRIES = 3;
+
+    private static final Logger logger = LoggerFactory.getLogger(RequestService.class);
 
     @Autowired
     private RequestRepository requestRepository;
@@ -46,34 +50,39 @@ public class RequestService {
     }
 
     @Transactional
-    public Request createRequest(AmbulanceRequestDto ambulanceRequestDto)
+    public Request createRequest(AmbulanceRequestDto requestDto, com.ambulance.ambulance_service.entity.User user)
             throws NoAvailableAmbulanceException {
-
+        
         int attempt = 0;
         while (attempt < MAX_RETRIES) {
             try {
-                return createRequestTransaction(ambulanceRequestDto);
+                return createRequestTransaction(requestDto, user);
             } catch (ObjectOptimisticLockingFailureException ex) {
                 attempt++;
                 if (attempt >= MAX_RETRIES) {
+                    logger.warn("Max retries ({}) reached for ambulance assignment", MAX_RETRIES);
                     break;
                 }
-                // Log and retry
-                System.out.println("Retrying ambulance assignment (attempt " + attempt + ")");
+                logger.info("Retrying ambulance assignment (attempt {}/{})", attempt, MAX_RETRIES);
             }
         }
         
         // If we get here, all retries failed - queue the request
-        return queueRequest(ambulanceRequestDto);
+        return queueRequest(requestDto, user);
     }
 
-    private Request createRequestTransaction(AmbulanceRequestDto ambulanceRequestDto) throws NoAvailableAmbulanceException {
+    private Request createRequestTransaction(AmbulanceRequestDto requestDto, com.ambulance.ambulance_service.entity.User user) throws NoAvailableAmbulanceException {
         Request request = new Request(
-                ambulanceRequestDto.getUserName(),
-                ambulanceRequestDto.getUserContact(),
-                ambulanceRequestDto.getLocation(),
-                ambulanceRequestDto.getEmergencyDescription()
+                requestDto.getUserName(),
+                requestDto.getUserContact(),
+                requestDto.getLocation(),
+                requestDto.getEmergencyDescription()
         );
+
+        // Set the user if provided (for authenticated users)
+        if (user != null) {
+            request.setUser(user);
+        }
 
         // Save request first
         request = requestRepository.save(request);
@@ -88,8 +97,8 @@ public class RequestService {
 
             // Create or find patient
             Patient patient = patientService.findOrCreatePatient(
-                    ambulanceRequestDto.getUserName(),
-                    ambulanceRequestDto.getUserContact()
+                    requestDto.getUserName(),
+                    requestDto.getUserContact()
             );
 
             // Create service history
@@ -101,23 +110,28 @@ public class RequestService {
         }
     }
 
-    private Request queueRequest(AmbulanceRequestDto ambulanceRequestDto) {
-        System.out.println("No ambulances available - adding request to queue");
+    private Request queueRequest(AmbulanceRequestDto requestDto, com.ambulance.ambulance_service.entity.User user) {
+        logger.info("No ambulances available - adding request to queue");
         
         // Create and save the request with PENDING status
         Request request = new Request(
-                ambulanceRequestDto.getUserName(),
-                ambulanceRequestDto.getUserContact(),
-                ambulanceRequestDto.getLocation(),
-                ambulanceRequestDto.getEmergencyDescription()
+                requestDto.getUserName(),
+                requestDto.getUserContact(),
+                requestDto.getLocation(),
+                requestDto.getEmergencyDescription()
         );
+        // Set the user if provided (for authenticated users)
+        if (user != null) {
+            request.setUser(user);
+        }
+
         request.setStatus(RequestStatus.PENDING);
         
         // Save the request (without assigning an ambulance)
         request = requestRepository.save(request);
         
         // Log the queued request
-        System.out.println("Request " + request.getId() + " added to queue");
+        logger.info("Request {} added to queue", request.getId());
         
         return request;
     }
@@ -131,7 +145,7 @@ public class RequestService {
             return;
         }
         
-        System.out.println("Processing " + queuedRequests.size() + " queued requests");
+        logger.info("Processing {} queued requests", queuedRequests.size());
         
         for (Request request : queuedRequests) {
             try {
@@ -154,13 +168,13 @@ public class RequestService {
                     
                     requestRepository.save(request);
                     
-                    System.out.println("Assigned ambulance " + ambulance.getId() + " to request " + request.getId());
+                    logger.info("Assigned ambulance {} to request {}", ambulance.getId(), request.getId());
                 } else {
-                    System.out.println("No ambulances available for request " + request.getId());
+                    logger.info("No ambulances available for request {}", request.getId());
                     break; // No more ambulances available, try again later
                 }
             } catch (Exception e) {
-                System.err.println("Error processing queued request " + request.getId() + ": " + e.getMessage());
+                logger.error("Error processing queued request {}: {}", request.getId(), e.getMessage());
                 // Continue with next request
             }
         }

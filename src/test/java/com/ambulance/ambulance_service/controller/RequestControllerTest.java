@@ -39,6 +39,7 @@ class RequestControllerTest {
 
     private AmbulanceRequestDto validRequestDto;
     private Request mockRequest;
+    private User mockUser;
 
     @BeforeEach
     void setUp() {
@@ -63,12 +64,17 @@ class RequestControllerTest {
         mockRequest.setStatus(RequestStatus.DISPATCHED);
         mockRequest.setRequestTime(LocalDateTime.now());
         mockRequest.setDispatchTime(LocalDateTime.now());
+
+        mockUser = new User();
+        mockUser.setId(1L);
+        mockUser.setRole(Role.USER);
+
     }
 
     @Test
     void testCreateRequest_Success() throws Exception {
         // Arrange
-        when(requestService.createRequest(any(AmbulanceRequestDto.class))).thenReturn(mockRequest);
+        when(requestService.createRequest(any(AmbulanceRequestDto.class), any(User.class))).thenReturn(mockRequest);
 
         // Act & Assert
         mockMvc.perform(post("/api/requests")
@@ -83,7 +89,7 @@ class RequestControllerTest {
                 .andExpect(jsonPath("$.requestTime", notNullValue()))
                 .andExpect(jsonPath("$.dispatchTime", notNullValue()));
 
-        verify(requestService, times(1)).createRequest(any(AmbulanceRequestDto.class));
+        verify(requestService, times(1)).createRequest(any(AmbulanceRequestDto.class), any(User.class));
     }
 
     @Test
@@ -103,7 +109,7 @@ class RequestControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.userContact", containsString("Invalid phone number format")));
 
-        verify(requestService, never()).createRequest((AmbulanceRequestDto) any());
+        verify(requestService, never()).createRequest(any(AmbulanceRequestDto.class), any(User.class));
     }
 
     @Test
@@ -121,13 +127,13 @@ class RequestControllerTest {
                 .andExpect(jsonPath("$.userContact", containsString("required")))
                 .andExpect(jsonPath("$.location", containsString("required")));
 
-        verify(requestService, never()).createRequest((AmbulanceRequestDto) any());
+        verify(requestService, never()).createRequest(any(AmbulanceRequestDto.class), any(User.class));
     }
 
     @Test
     void testCreateRequest_NoAvailableAmbulance() throws Exception {
         // Arrange
-        when(requestService.createRequest(any(AmbulanceRequestDto.class)))
+        when(requestService.createRequest(any(AmbulanceRequestDto.class), any(User.class)))
                 .thenThrow(new RuntimeException(new NoAvailableAmbulanceException("No ambulance available")));
 
         // Act & Assert - Changed from isInternalServerError() to isServiceUnavailable()
@@ -137,7 +143,7 @@ class RequestControllerTest {
                 .andExpect(status().isServiceUnavailable()) // Updated to 503
                 .andExpect(jsonPath("$.error", is("No ambulance available"))); // Added response body check
 
-        verify(requestService, times(1)).createRequest(any(AmbulanceRequestDto.class));
+        verify(requestService, times(1)).createRequest(any(AmbulanceRequestDto.class), any(User.class));
     }
 
     @Test

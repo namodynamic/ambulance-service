@@ -154,7 +154,7 @@
                                 <input type="text" id="caller-name" name="callerName" placeholder="Full Name" required>
                             </div>
                             <div class="form-group">
-                                <label for="phone">Phone Number <small>(10-15 digits, e.g. 1234567890 or +1234567890)</small></label>
+                                <label for="phone">Phone Number</label>
                                 <input
                                     type="tel"
                                     id="phone"
@@ -213,7 +213,7 @@
                     </div>
 
                     <div class="request-status-card">
-                        <h2>Your Request ID: <span id="confirmation-request-id">#XYZ789</span></h2>
+                        <h2>Your Request ID: <span id="confirmation-request-id">#RQST123</span></h2>
 
                         <!-- Status Timeline -->
                         <div class="status-timeline">
@@ -509,7 +509,7 @@
                         <div class="stat-card">
                             <div class="stat-icon">🚨</div>
                             <div class="stat-content">
-<!--                                <h3 id="active-requests">0</h3>-->
+                                <h3 id="active-requests">0</h3>
                                 <p>Active Requests</p>
                             </div>
                         </div>
@@ -584,8 +584,8 @@
                 </div>
 
                 <!-- History Section -->
-                <div id="history-section" class="admin-section">
-                    <h1>Service History</h1>
+                <div id="history-section" class="admin-section" style="display: none;">
+                    <h2>Service History</h2>
                     <div class="history-filters">
                         <input type="date" id="date-from" onchange="filterHistory()">
                         <input type="date" id="date-to" onchange="filterHistory()">
@@ -595,8 +595,8 @@
                             <option value="CANCELLED">Cancelled</option>
                         </select>
                     </div>
-                    <div id="history-list" class="history-container">
-                        <!-- History will be populated here -->
+                    <div id="history-container" class="history-container">
+                        <!-- History data will be loaded here -->
                     </div>
                 </div>
             </div>
@@ -662,13 +662,11 @@
     </footer>
 </div>
 
-<!-- Core scripts first -->
-<script src="js/api.js"></script>
+<script type="module" src="js/api.js"></script>
 <script src="js/data.js"></script>
 <script src="js/admin.js" defer></script>
 <script src="js/main.js"></script>
 <script src="/js/user-dashboard.js"></script>
-<!-- Auth script last to override any functions if needed -->
 <script src="js/auth.js"></script>
 </body>
 </html>

@@ -4,6 +4,7 @@ import com.ambulance.ambulance_service.entity.Ambulance;
 import com.ambulance.ambulance_service.entity.AvailabilityStatus;
 import com.ambulance.ambulance_service.entity.User;
 import com.ambulance.ambulance_service.entity.Patient;
+import com.ambulance.ambulance_service.entity.Role;
 import com.ambulance.ambulance_service.repository.AmbulanceRepository;
 import com.ambulance.ambulance_service.repository.UserRepository;
 import com.ambulance.ambulance_service.repository.PatientRepository;
@@ -47,36 +48,43 @@ public class DataInitializer implements CommandLineRunner {
         // Initialize users
         if (userRepository.count() == 0) {
             // Create admin user
+            String adminPassword = "admin123";
             User admin = new User(
                     "admin",
-                    passwordEncoder.encode("admin123"),
-                    "ROLE_ADMIN",
+                    passwordEncoder.encode(adminPassword),
+                    Role.ADMIN,
                     "admin@ambulance.com"
             );
-            userRepository.save(admin);
-
+            admin.setEnabled(true);
+            admin = userRepository.save(admin);
+            
             // Create dispatcher user
+            String dispatcherPassword = "dispatcher123";
             User dispatcher = new User(
                     "dispatcher",
-                    passwordEncoder.encode("dispatcher123"),
-                    "ROLE_DISPATCHER",
+                    passwordEncoder.encode(dispatcherPassword),
+                    Role.DISPATCHER,
                     "dispatcher@ambulance.com"
             );
-            userRepository.save(dispatcher);
+            dispatcher.setEnabled(true);
+            dispatcher = userRepository.save(dispatcher);
 
             // Create regular user
+            String userPassword = "user123";
             User user = new User(
                     "user",
-                    passwordEncoder.encode("user123"),
-                    "ROLE_USER",
+                    passwordEncoder.encode(userPassword),
+                    Role.USER,
                     "user@ambulance.com"
             );
-            userRepository.save(user);
+            user.setEnabled(true);
+            user = userRepository.save(user);
 
-            System.out.println("Initial users created successfully!");
-            System.out.println("Admin: admin/admin123");
-            System.out.println("Dispatcher: dispatcher/dispatcher123");
-            System.out.println("User: user/user123");
+            System.out.println("\n=== Initial Users Created ===");
+            System.out.println("Admin: username=admin, password=admin123, enabled=" + admin.isEnabled());
+            System.out.println("Dispatcher: username=dispatcher, password=dispatcher123, enabled=" + dispatcher.isEnabled());
+            System.out.println("User: username=user, password=user123, enabled=" + user.isEnabled());
+            System.out.println("==========================\n");
         }
 
         // Initialize sample patients

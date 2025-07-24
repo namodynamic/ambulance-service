@@ -1,6 +1,8 @@
 package com.ambulance.ambulance_service.service;
 
 import com.ambulance.ambulance_service.entity.*;
+import com.ambulance.ambulance_service.dto.ServiceHistoryDTO;
+import com.ambulance.ambulance_service.entity.ServiceHistory;
 import com.ambulance.ambulance_service.repository.ServiceHistoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ServiceHistoryService {
@@ -15,9 +18,31 @@ public class ServiceHistoryService {
     @Autowired
     private ServiceHistoryRepository serviceHistoryRepository;
 
-    public List<ServiceHistory> getAllServiceHistory() {
-        return serviceHistoryRepository.findAll();
+    public List<ServiceHistoryDTO> getAllServiceHistory() {
+        return serviceHistoryRepository.findAll().stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
+
+    // Add this helper method to convert entity to DTO
+    public ServiceHistoryDTO convertToDTO(ServiceHistory history) {
+        if (history == null) {
+            return null;
+        }
+
+        ServiceHistoryDTO dto = new ServiceHistoryDTO();
+        dto.setId(history.getId());
+        dto.setRequestId(history.getRequest() != null ? history.getRequest().getId() : null);
+        dto.setAmbulanceId(history.getAmbulance() != null ? history.getAmbulance().getId() : null);
+        dto.setPatientId(history.getPatient() != null ? history.getPatient().getId() : null);
+        dto.setStatus(history.getStatus());
+        dto.setNotes(history.getNotes());
+        dto.setArrivalTime(history.getArrivalTime());
+        dto.setCompletionTime(history.getCompletionTime());
+        dto.setCreatedAt(history.getCreatedAt());
+        return dto;
+    }
+
 
     public Optional<ServiceHistory> getServiceHistoryById(Long id) {
         return serviceHistoryRepository.findById(id);

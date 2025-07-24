@@ -17,11 +17,14 @@ public class Request {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "password"})
+    private User user;
+
     @Column(name = "user_name")
     private String userName;
 
-    @NotNull
     @Pattern(regexp = "^[+]?[0-9]{10,15}$", message = "Invalid phone number format")
     @Column(name = "user_contact")
     private String userContact;
@@ -32,7 +35,7 @@ public class Request {
     @Column(name = "emergency_description")
     private String emergencyDescription;
 
-    @Column(name = "request_time")
+    @Column(name = "request_time", nullable = false)
     private LocalDateTime requestTime;
 
     @Column(name = "dispatch_time")
@@ -70,11 +73,34 @@ public class Request {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public String getUserName() { return userName; }
-    public void setUserName(String userName) { this.userName = userName; }
+    public User getUser() {
+        return user;
+    }
 
-    public String getUserContact() { return userContact; }
-    public void setUserContact(String userContact) { this.userContact = userContact; }
+    public void setUser(User user) {
+        this.user = user;
+        // Only set the name from user, keep the contact info as provided
+        if (user != null) {
+            this.userName = user.getUsername();
+            // Don't override userContact with email
+        }
+    }
+
+    public String getUserName() {
+        return user != null ? user.getUsername() : userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public String getUserContact() {
+        return userContact; // Return the direct contact info, don't override with email
+    }
+
+    public void setUserContact(String userContact) {
+        this.userContact = userContact;
+    }
 
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }

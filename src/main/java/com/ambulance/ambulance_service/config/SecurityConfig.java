@@ -14,6 +14,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 import com.ambulance.ambulance_service.service.CustomUserDetailsService;
 
 @Configuration
@@ -48,6 +52,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         // Public static resources - allow all
@@ -74,9 +79,9 @@ public class SecurityConfig {
                         // Protected API endpoints with role-based access
                         .requestMatchers("/api/requests/**").hasAnyRole("USER", "ADMIN", "DISPATCHER")
                         .requestMatchers("/api/dispatch/**").hasAnyRole("DISPATCHER", "ADMIN")
-                        .requestMatchers("/api/ambulances/**").hasAnyRole("DISPATCHER", "ADMIN")
+                        .requestMatchers("/api/ambulances/**").hasAnyRole( "USER","DISPATCHER", "ADMIN")
                         .requestMatchers("/api/patients/**").hasAnyRole("DISPATCHER", "ADMIN")
-                        .requestMatchers("/api/service-history/**").hasAnyRole("DISPATCHER", "ADMIN")
+                        .requestMatchers("/api/service-history/**").hasAnyRole("USER", "DISPATCHER", "ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         // All other requests need authentication
@@ -88,5 +93,18 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8080"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

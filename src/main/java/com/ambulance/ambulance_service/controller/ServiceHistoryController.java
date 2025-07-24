@@ -1,5 +1,11 @@
 package com.ambulance.ambulance_service.controller;
 
+import com.ambulance.ambulance_service.dto.ServiceHistoryDTO;
+import com.ambulance.ambulance_service.exception.ErrorResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import com.ambulance.ambulance_service.entity.ServiceHistory;
 import com.ambulance.ambulance_service.entity.ServiceStatus;
 import com.ambulance.ambulance_service.service.ServiceHistoryService;
@@ -13,17 +19,23 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/service-history")
-@CrossOrigin(origins = "*")
+@RequestMapping("/api")
 public class ServiceHistoryController {
 
     @Autowired
     private ServiceHistoryService serviceHistoryService;
 
-    @GetMapping
-    public List<ServiceHistory> getAllServiceHistory() {
-        return serviceHistoryService.getAllServiceHistory();
+    @GetMapping("/service-history")
+    public ResponseEntity<?> getAllServiceHistory() {
+        try {
+            List<ServiceHistoryDTO> history = serviceHistoryService.getAllServiceHistory();
+            return ResponseEntity.ok(history);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to fetch service history: " + e.getMessage()));
+        }
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<ServiceHistory> getServiceHistoryById(@PathVariable Long id) {

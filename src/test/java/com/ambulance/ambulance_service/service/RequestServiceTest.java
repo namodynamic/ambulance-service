@@ -42,6 +42,7 @@ class RequestServiceTest {
     private Request dispatchedRequest;
     private Ambulance availableAmbulance;
     private Patient testPatient;
+    private User testUser;
 
     @BeforeEach
     void setUp() {
@@ -61,6 +62,10 @@ class RequestServiceTest {
         );
         initialRequest.setId(1L);
 
+        testUser = new User();
+        testUser.setId(1L);
+        testUser.setRole(Role.USER);
+
         availableAmbulance = new Ambulance();
         availableAmbulance.setCurrentLocation("Downtown Hospital");
         availableAmbulance.setAvailability(AvailabilityStatus.AVAILABLE);
@@ -76,6 +81,7 @@ class RequestServiceTest {
         dispatchedRequest.setAmbulance(availableAmbulance);
         dispatchedRequest.setStatus(RequestStatus.DISPATCHED);
         dispatchedRequest.setDispatchTime(LocalDateTime.now());
+        dispatchedRequest.setUser(testUser);
 
         testPatient = new Patient("John Doe", "+1234567890", "");
         testPatient.setId(1L);
@@ -93,13 +99,14 @@ class RequestServiceTest {
         when(serviceHistoryService.createServiceHistory(any(), any(), any())).thenReturn(new ServiceHistory());
 
         // Act
-        Request result = requestService.createRequest(validRequestDto);
+        Request result = requestService.createRequest(validRequestDto, testUser);
 
         // Assert
-        assertNotNull(result, "Request should be created successfully");
+        assertNotNull(result, "Request should be created");
         assertEquals(RequestStatus.DISPATCHED, result.getStatus(), "Request should be dispatched");
         assertNotNull(result.getDispatchTime(), "Dispatch time should be set");
         assertEquals(availableAmbulance, result.getAmbulance(), "Ambulance should be assigned");
+        assertEquals(testUser, result.getUser(), "User should be assigned to request");
 
         // Verify interactions
         verify(requestRepository, times(2)).save(any(Request.class));
@@ -117,7 +124,7 @@ class RequestServiceTest {
         // Act & Assert
         NoAvailableAmbulanceException exception = assertThrows(
                 NoAvailableAmbulanceException.class,
-                () -> requestService.createRequest(validRequestDto),
+                () -> requestService.createRequest(validRequestDto, testUser),
                 "Should throw NoAvailableAmbulanceException when no ambulance available"
         );
 

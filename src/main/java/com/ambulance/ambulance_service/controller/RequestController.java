@@ -6,7 +6,9 @@ import com.ambulance.ambulance_service.entity.RequestStatus;
 import com.ambulance.ambulance_service.entity.RequestStatusHistory;
 import com.ambulance.ambulance_service.exception.NoAvailableAmbulanceException;
 import com.ambulance.ambulance_service.exception.RequestNotFoundException;
+import com.ambulance.ambulance_service.repository.UserRepository;
 import com.ambulance.ambulance_service.service.RequestService;
+import com.ambulance.ambulance_service.service.UserService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -14,6 +16,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +34,12 @@ public class RequestController {
     @Autowired
     private RequestService requestService;
 
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private UserRepository userRepository;
+
     @GetMapping
     public List<Request> getAllRequests() {
         return requestService.getAllRequests();
@@ -44,20 +53,44 @@ public class RequestController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createRequest(@Valid @RequestBody AmbulanceRequestDto requestDto, BindingResult bindingResult) {
+    public ResponseEntity<?> createRequest(
+            @Valid @RequestBody AmbulanceRequestDto requestDto,
+            BindingResult bindingResult,
+            Authentication authentication) {
+
         if (bindingResult.hasErrors()) {
             return handleValidationErrors(bindingResult);
         }
 
         try {
-            Request request = requestService.createRequest(requestDto);
+            // Get the authenticated user (can be null for unauthenticated requests)
+            com.ambulance.ambulance_service.entity.User user = null;
+            if (authentication != null && authentication.isAuthenticated() && 
+                authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.User) {
+                
+                org.springframework.security.core.userdetails.User principal = 
+                    (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
+                
+                // Get the user from the database
+                user = userRepository.findByUsername(principal.getUsername())
+                    .orElse(null);
+                
+                if (user != null) {
+                    // For authenticated users, use their details from the database
+                    // Only set the username from the user object, keep the contact from the request
+                    requestDto.setUserName(user.getUsername());
+                    // Don't override userContact with email to avoid validation issues
+                    // The frontend should provide a valid phone number in the request
+                }
+            }
+
+            Request request = requestService.createRequest(requestDto, user);
             return ResponseEntity.ok(request);
         } catch (NoAvailableAmbulanceException e) {
-            // Return 503 with the error message
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            // Log other unexpected errors
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "An unexpected error occurred: " + e.getMessage()));
         }
