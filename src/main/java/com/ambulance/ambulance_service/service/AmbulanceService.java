@@ -3,58 +3,100 @@ package com.ambulance.ambulance_service.service;
 import com.ambulance.ambulance_service.entity.Ambulance;
 import com.ambulance.ambulance_service.entity.AvailabilityStatus;
 import com.ambulance.ambulance_service.repository.AmbulanceRepository;
-import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.transaction.Transactional;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 @Service
-public class AmbulanceService {
+@Transactional
+public class AmbulanceService implements AmbulanceServiceInterface {
+    private static final Logger logger = LoggerFactory.getLogger(AmbulanceService.class);
 
     @Autowired
     private AmbulanceRepository ambulanceRepository;
 
-    private Map<Long, Ambulance> ambulanceCache = new HashMap<>();
-    private Queue<Ambulance> availableQueue = new LinkedList<>();
+    private final Map<Long, Ambulance> ambulanceCache = new ConcurrentHashMap<>();
+    private final Queue<Ambulance> availableQueue = new ConcurrentLinkedQueue<>();
 
     @PostConstruct
     public void init() {
         loadAmbulances();
     }
 
-    private void loadAmbulances() {
+    private synchronized void loadAmbulances() {
+        availableQueue.clear();
+        ambulanceCache.clear();
+        
         List<Ambulance> ambulances = ambulanceRepository.findAll();
-        for (Ambulance amb : ambulances) {
-            ambulanceCache.put(amb.getId(), amb);
-            if (amb.getAvailability() == AvailabilityStatus.AVAILABLE) {
-                availableQueue.offer(amb);
+        for (Ambulance ambulance : ambulances) {
+            ambulanceCache.put(ambulance.getId(), ambulance);
+            if (ambulance.getAvailability() == AvailabilityStatus.AVAILABLE) {
+                availableQueue.offer(ambulance);
             }
         }
+        logger.info("Loaded {} ambulances, {} available", ambulances.size(), availableQueue.size());
     }
 
+    @Override
     public List<Ambulance> getAllAmbulances() {
-        return ambulanceRepository.findAll();
+        return new ArrayList<>(ambulanceCache.values());
     }
 
+    @Override
     public Optional<Ambulance> getAmbulanceById(Long id) {
-        return ambulanceRepository.findById(id);
+        return Optional.ofNullable(ambulanceCache.get(id));
     }
 
+    @Override
     public Ambulance saveAmbulance(Ambulance ambulance) {
         Ambulance saved = ambulanceRepository.save(ambulance);
-        ambulanceCache.put(saved.getId(), saved);
-        if (saved.getAvailability() == AvailabilityStatus.AVAILABLE) {
-            availableQueue.offer(saved);
-        }
+        updateCacheAndQueue(saved);
         return saved;
     }
 
-    public List<Ambulance> getAvailableAmbulances() {
-        return ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE);
+    @Override
+    public void updateAmbulanceStatus(Long ambulanceId, AvailabilityStatus newStatus) {
+        ambulanceRepository.findById(ambulanceId).ifPresent(ambulance -> {
+            AvailabilityStatus oldStatus = ambulance.getAvailability();
+            ambulance.setAvailability(newStatus);
+            Ambulance updated = ambulanceRepository.save(ambulance);
+            updateCacheAndQueue(updated);
+            
+            logger.info("Updated ambulance {} status from {} to {}", 
+                updated.getId(), oldStatus, newStatus);
+        });
     }
 
+    private synchronized void updateCacheAndQueue(Ambulance ambulance) {
+        // Update cache
+        ambulanceCache.put(ambulance.getId(), ambulance);
+        
+        // Update queue based on new status
+        if (ambulance.getAvailability() == AvailabilityStatus.AVAILABLE) {
+            // Only add to queue if not already present
+            if (!availableQueue.contains(ambulance)) {
+                availableQueue.offer(ambulance);
+            }
+        } else {
+            // Remove from queue if status is not AVAILABLE
+            availableQueue.remove(ambulance);
+        }
+    }
+
+    @Override
+    public List<Ambulance> getAvailableAmbulances() {
+        return new ArrayList<>(availableQueue);
+    }
+
+    @Override
     public Optional<Ambulance> getNextAvailableAmbulance() {
         Ambulance ambulance;
         while ((ambulance = availableQueue.poll()) != null) {
@@ -64,48 +106,36 @@ public class AmbulanceService {
                 if (currentOpt.isPresent()) {
                     Ambulance current = currentOpt.get();
                     if (current.getAvailability() == AvailabilityStatus.AVAILABLE) {
-                        // Update status and save
+                        // Update status to DISPATCHED and save
                         current.setAvailability(AvailabilityStatus.DISPATCHED);
-                        Ambulance updated = ambulanceRepository.save(current);
-                        ambulanceCache.put(updated.getId(), updated);
-                        return Optional.of(updated);
+                        Ambulance saved = ambulanceRepository.save(current);
+                        updateCacheAndQueue(saved);
+                        logger.info("Dispatched ambulance: {}", saved.getId());
+                        return Optional.of(saved);
                     }
                 }
             } catch (ObjectOptimisticLockingFailureException ex) {
-                // Retry with next ambulance
+                // If there's a conflict, re-add to queue and retry
+                if (ambulance.getAvailability() == AvailabilityStatus.AVAILABLE) {
+                    availableQueue.offer(ambulance);
+                }
+                logger.warn("Optimistic lock conflict while dispatching ambulance: {}", ambulance.getId());
                 continue;
             }
         }
-
-        // If queue is empty, try to find one directly from DB
-        Optional<Ambulance> dbAmbulance = ambulanceRepository.findFirstByAvailability(AvailabilityStatus.AVAILABLE);
-        if (dbAmbulance.isPresent()) {
-            Ambulance found = dbAmbulance.get();
-            found.setAvailability(AvailabilityStatus.DISPATCHED);
-            ambulanceRepository.save(found);
-            ambulanceCache.put(found.getId(), found);
-            return Optional.of(found);
-        }
-
+        logger.warn("No available ambulances found");
         return Optional.empty();
     }
 
-    public void updateAmbulanceStatus(Long ambulanceId, AvailabilityStatus status) {
-        Optional<Ambulance> ambulanceOpt = ambulanceRepository.findById(ambulanceId);
-        if (ambulanceOpt.isPresent()) {
-            Ambulance ambulance = ambulanceOpt.get();
-            ambulance.setAvailability(status);
-            ambulanceRepository.save(ambulance);
+    @Override
+    public long countAllAmbulances() {
+        return ambulanceCache.size();
+    }
 
-            // Update cache
-            ambulanceCache.put(ambulanceId, ambulance);
-
-            // Manage queue
-            if (status == AvailabilityStatus.AVAILABLE && !availableQueue.contains(ambulance)) {
-                availableQueue.offer(ambulance);
-            } else if (status != AvailabilityStatus.AVAILABLE) {
-                availableQueue.remove(ambulance);
-            }
-        }
+    @Override
+    public long countAmbulancesByStatus(AvailabilityStatus status) {
+        return ambulanceCache.values().stream()
+            .filter(a -> a.getAvailability() == status)
+            .count();
     }
 }

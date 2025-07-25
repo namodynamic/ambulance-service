@@ -9,12 +9,16 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class PatientService<T extends Patient> {
+public class PatientService implements PatientServiceInterface<Patient> {
+
+    private final PatientRepository patientRepository;
 
     @Autowired
-    private PatientRepository patientRepository;
+    public PatientService(PatientRepository patientRepository) {
+        this.patientRepository = patientRepository;
+    }
 
-    // Generic method to handle patient records
+    @Override
     public <T> Optional<T> getPatientRecord(Long id, Class<T> type) {
         if (type.equals(Patient.class)) {
             return (Optional<T>) patientRepository.findById(id);
@@ -22,23 +26,27 @@ public class PatientService<T extends Patient> {
         return Optional.empty();
     }
 
-    // Generic method to save patient records
+    @Override
     public <T extends Patient> T savePatientRecord(T patient) {
         return (T) patientRepository.save(patient);
     }
 
+    @Override
     public List<Patient> getAllPatients() {
         return patientRepository.findAll();
     }
 
+    @Override
     public Optional<Patient> getPatientById(Long id) {
         return patientRepository.findById(id);
     }
 
+    @Override
     public Patient savePatient(Patient patient) {
         return patientRepository.save(patient);
     }
 
+    @Override
     public Patient findOrCreatePatient(String name, String contact) {
         Optional<Patient> existingPatient = patientRepository.findByContact(contact);
         if (existingPatient.isPresent()) {
@@ -49,7 +57,13 @@ public class PatientService<T extends Patient> {
         }
     }
 
+    @Override
     public Optional<Patient> findPatientByContact(String contact) {
         return patientRepository.findByContact(contact);
+    }
+
+    @Override
+    public long countAllPatients() {
+        return patientRepository.count();
     }
 }

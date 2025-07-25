@@ -1,103 +1,117 @@
 package com.ambulance.ambulance_service.config;
 
 import com.ambulance.ambulance_service.entity.Ambulance;
-import com.ambulance.ambulance_service.entity.AvailabilityStatus;
-import com.ambulance.ambulance_service.entity.User;
 import com.ambulance.ambulance_service.entity.Patient;
 import com.ambulance.ambulance_service.entity.Role;
+import com.ambulance.ambulance_service.entity.User;
+import com.ambulance.ambulance_service.entity.AvailabilityStatus;
 import com.ambulance.ambulance_service.repository.AmbulanceRepository;
-import com.ambulance.ambulance_service.repository.UserRepository;
 import com.ambulance.ambulance_service.repository.PatientRepository;
+import com.ambulance.ambulance_service.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
+/**
+ * DataInitializer populates the database with initial test data.
+ * This will only run in the 'dev' or 'test' profiles.
+ */
 @Component
+@Profile({"dev", "test"})
 public class DataInitializer implements CommandLineRunner {
 
-    @Autowired
-    private AmbulanceRepository ambulanceRepository;
+    private final UserRepository userRepository;
+    private final AmbulanceRepository ambulanceRepository;
+    private final PatientRepository patientRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PatientRepository patientRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    public DataInitializer(UserRepository userRepository,
+                          AmbulanceRepository ambulanceRepository,
+                          PatientRepository patientRepository,
+                          PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.ambulanceRepository = ambulanceRepository;
+        this.patientRepository = patientRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     @Override
-    public void run(String... args) throws Exception {
-        // Initialize ambulances
-        if (ambulanceRepository.count() == 0) {
-            Ambulance amb1 = new Ambulance("Station A - Downtown", AvailabilityStatus.AVAILABLE);
-            Ambulance amb2 = new Ambulance("Station B - North Side", AvailabilityStatus.AVAILABLE);
-            Ambulance amb3 = new Ambulance("Station C - South District", AvailabilityStatus.MAINTENANCE);
-            Ambulance amb4 = new Ambulance("Emergency Station 1", AvailabilityStatus.AVAILABLE);
-
-            ambulanceRepository.save(amb1);
-            ambulanceRepository.save(amb2);
-            ambulanceRepository.save(amb3);
-            ambulanceRepository.save(amb4);
-
-            System.out.println("Initial ambulances created successfully!");
-        }
-
-        // Initialize users
+    public void run(String... args) {
+        // Only initialize if no users exist
         if (userRepository.count() == 0) {
-            // Create admin user
-            String adminPassword = "admin123";
-            User admin = new User(
-                    "admin",
-                    passwordEncoder.encode(adminPassword),
-                    Role.ADMIN,
-                    "admin@ambulance.com"
-            );
-            admin.setEnabled(true);
-            admin = userRepository.save(admin);
-            
-            // Create dispatcher user
-            String dispatcherPassword = "dispatcher123";
-            User dispatcher = new User(
-                    "dispatcher",
-                    passwordEncoder.encode(dispatcherPassword),
-                    Role.DISPATCHER,
-                    "dispatcher@ambulance.com"
-            );
-            dispatcher.setEnabled(true);
-            dispatcher = userRepository.save(dispatcher);
-
-            // Create regular user
-            String userPassword = "user123";
-            User user = new User(
-                    "user",
-                    passwordEncoder.encode(userPassword),
-                    Role.USER,
-                    "user@ambulance.com"
-            );
-            user.setEnabled(true);
-            user = userRepository.save(user);
-
-            System.out.println("\n=== Initial Users Created ===");
-            System.out.println("Admin: username=admin, password=admin123, enabled=" + admin.isEnabled());
-            System.out.println("Dispatcher: username=dispatcher, password=dispatcher123, enabled=" + dispatcher.isEnabled());
-            System.out.println("User: username=user, password=user123, enabled=" + user.isEnabled());
-            System.out.println("==========================\n");
+            createAdminUser();
+            createDispatcherUser();
+            createRegularUser();
+            createAmbulances();
+            createPatients();
         }
+    }
 
-        // Initialize sample patients
-        if (patientRepository.count() == 0) {
-            Patient patient1 = new Patient("John Doe", "+1234567890", "No known allergies");
-            Patient patient2 = new Patient("Jane Smith", "+1234567891", "Diabetic patient");
-            Patient patient3 = new Patient("Bob Johnson", "+1234567892", "Hypertension");
+    private void createAdminUser() {
+        User admin = new User();
+        admin.setUsername("admin");
+        admin.setPassword(passwordEncoder.encode("admin123"));
+        admin.setRole(Role.ADMIN);
+        admin.setEmail("admin@ambulance.com");
+        admin.setFirstName("Admin");
+        admin.setLastName("User");
+        admin.setEnabled(true);
+        userRepository.save(admin);
+    }
 
-            patientRepository.save(patient1);
-            patientRepository.save(patient2);
-            patientRepository.save(patient3);
+    private void createDispatcherUser() {
+        User dispatcher = new User();
+        dispatcher.setUsername("dispatcher");
+        dispatcher.setPassword(passwordEncoder.encode("dispatcher123"));
+        dispatcher.setRole(Role.DISPATCHER);
+        dispatcher.setEmail("dispatcher@ambulance.com");
+        dispatcher.setFirstName("Dispatch");
+        dispatcher.setLastName("Officer");
+        dispatcher.setEnabled(true);
+        userRepository.save(dispatcher);
+    }
 
-            System.out.println("Initial patients created successfully!");
+    private void createRegularUser() {
+        User user = new User();
+        user.setUsername("user");
+        user.setPassword(passwordEncoder.encode("user123"));
+        user.setRole(Role.USER);
+        user.setEmail("user@ambulance.com");
+        user.setFirstName("Regular");
+        user.setLastName("User");
+        user.setEnabled(true);
+        userRepository.save(user);
+    }
+
+    private void createAmbulances() {
+        for (int i = 1; i <= 5; i++) {
+            Ambulance ambulance = new Ambulance();
+            ambulance.setCurrentLocation("Location " + i);
+            ambulance.setAvailability(i % 2 == 0 ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.DISPATCHED);
+            ambulanceRepository.save(ambulance);
         }
+    }
+
+    private void createPatients() {
+        Patient patient1 = new Patient();
+        patient1.setName("John Doe");
+        patient1.setContact("+2340567890");
+        patient1.setMedicalNotes("Allergic to penicillin");
+        patient1.setCreatedAt(LocalDateTime.now());
+        patient1.setUpdatedAt(LocalDateTime.now());
+        patientRepository.save(patient1);
+
+        Patient patient2 = new Patient();
+        patient2.setName("Jane Smith");
+        patient2.setContact("+23407654321");
+        patient2.setMedicalNotes("History of heart conditions");
+        patient2.setCreatedAt(LocalDateTime.now());
+        patient2.setUpdatedAt(LocalDateTime.now());
+        patientRepository.save(patient2);
     }
 }

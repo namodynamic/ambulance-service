@@ -24,7 +24,8 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class RequestService {
+@Transactional
+public class RequestService implements RequestServiceInterface {
     private static final int MAX_RETRIES = 3;
 
     private static final Logger logger = LoggerFactory.getLogger(RequestService.class);
@@ -44,14 +45,17 @@ public class RequestService {
     @Autowired
     private RequestStatusHistoryRepository statusHistoryRepository;
 
+    @Override
     public List<Request> getAllRequests() {
         return requestRepository.findAllByOrderByRequestTimeDesc();
     }
 
+    @Override
     public Optional<Request> getRequestById(Long id) {
         return requestRepository.findById(id);
     }
 
+    @Override
     @Transactional
     public Request createRequest(AmbulanceRequestDto requestDto, com.ambulance.ambulance_service.entity.User user)
             throws NoAvailableAmbulanceException {
@@ -183,16 +187,8 @@ public class RequestService {
         }
     }
 
-    /**
-     * Update the status of a request and record the change in history
-     * @param requestId The ID of the request to update
-     * @param newStatus The new status to set
-     * @param notes Optional notes about the status change
-     * @return The updated request
-     * @throws RequestNotFoundException if the request is not found
-     */
-    @Transactional
-    public Request updateRequestStatus(Long requestId, RequestStatus newStatus, String notes) 
+    @Override
+    public Request updateRequestStatus(Long requestId, RequestStatus status, String notes) 
             throws RequestNotFoundException {
         
         // Get the current username from security context
@@ -203,10 +199,10 @@ public class RequestService {
             RequestStatus oldStatus = request.getStatus();
             
             // Update the status and record history
-            request.updateStatus(newStatus, changedBy, notes);
+            request.updateStatus(status, changedBy, notes);
             
             // If completed, update ambulance status back to available
-            if (newStatus == RequestStatus.COMPLETED && request.getAmbulance() != null) {
+            if (status == RequestStatus.COMPLETED && request.getAmbulance() != null) {
                 ambulanceService.updateAmbulanceStatus(
                         request.getAmbulance().getId(),
                         AvailabilityStatus.AVAILABLE
@@ -218,13 +214,7 @@ public class RequestService {
         }).orElseThrow(() -> new RequestNotFoundException("Request not found with id: " + requestId));
     }
     
-    /**
-     * Get the status history for a specific request
-     * @param requestId The ID of the request
-     * @return List of status history entries, most recent first
-     * @throws RequestNotFoundException if the request is not found
-     */
-    @Transactional(readOnly = true)
+    @Override
     public List<RequestStatusHistory> getRequestStatusHistory(Long requestId) 
             throws RequestNotFoundException {
                 
@@ -235,6 +225,69 @@ public class RequestService {
         return statusHistoryRepository.findByRequestIdOrderByCreatedAtDesc(requestId);
     }
     
+    @Override
+    public List<Request> getRequestsByStatus(RequestStatus status) {
+        return requestRepository.findByStatus(status);
+    }
+
+    @Override
+    public List<Request> getPendingRequests() {
+        return requestRepository.findByStatus(RequestStatus.PENDING);
+    }
+
+    @Override
+    public List<Request> getRequestsByUser(User user) {
+        return requestRepository.findByUserOrderByRequestTimeDesc(user);
+    }
+
+    @Override
+    public List<Request> getActiveRequestsByUser(User user) {
+        List<RequestStatus> activeStatuses = Arrays.asList(
+            RequestStatus.PENDING,
+            RequestStatus.DISPATCHED,
+            RequestStatus.IN_PROGRESS,
+            RequestStatus.ARRIVED
+        );
+        return requestRepository.findByUserAndStatusInOrderByRequestTimeDesc(user, activeStatuses);
+    }
+
+    @Override
+    public Page<Request> getActiveUserRequests(User user, Pageable pageable) {
+        List<RequestStatus> activeStatuses = Arrays.asList(
+            RequestStatus.PENDING,
+            RequestStatus.DISPATCHED,
+            RequestStatus.IN_PROGRESS,
+            RequestStatus.ARRIVED
+        );
+        return requestRepository.findByUserAndStatusIn(user, activeStatuses, pageable);
+    }
+
+    @Override
+    public long countAllRequests() {
+        return requestRepository.count();
+    }
+
+    @Override
+    public long countRequestsByStatus(String status) {
+        try {
+            RequestStatus requestStatus = RequestStatus.valueOf(status.toUpperCase());
+            return requestRepository.countByStatus(requestStatus);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Invalid status value: {}", status);
+            return 0;
+        }
+    }
+
+    @Override
+    public Request createRequest(Request request) {
+        return requestRepository.save(request);
+    }
+
+    @Override
+    public Request updateRequest(Request request) {
+        return requestRepository.save(request);
+    }
+
     /**
      * Helper method to get the current authenticated username
      * @return The username or 'system' if not available
@@ -253,50 +306,6 @@ public class RequestService {
         return updateRequestStatus(requestId, status, null);
     }
 
-    public List<Request> getRequestsByStatus(RequestStatus status) {
-        return requestRepository.findByStatus(status);
-    }
-
-    public List<Request> getPendingRequests() {
-        return requestRepository.findByStatus(RequestStatus.PENDING);
-    }
-
-    // Helper method for backward compatibility
-    public Request createRequest(Request request) {
-        return requestRepository.save(request);
-    }
-
-    public Request updateRequest(Request request) {
-        return requestRepository.save(request);
-    }
-
-    /**
-     * Get all requests for a specific user
-     * @param user The user to get requests for
-     * @return List of user's requests, ordered by request time (newest first)
-     */
-    @Transactional(readOnly = true)
-    public List<Request> getRequestsByUser(User user) {
-        return requestRepository.findByUserOrderByRequestTimeDesc(user);
-    }
-    
-    /**
-     * Get active requests for a specific user
-     * Active requests are those that are not completed or cancelled
-     * @param user The user to get active requests for
-     * @return List of user's active requests, ordered by request time (newest first)
-     */
-    @Transactional(readOnly = true)
-    public List<Request> getActiveRequestsByUser(User user) {
-        List<RequestStatus> activeStatuses = Arrays.asList(
-            RequestStatus.PENDING,
-            RequestStatus.DISPATCHED,
-            RequestStatus.IN_PROGRESS,
-            RequestStatus.ARRIVED
-        );
-        return requestRepository.findByUserAndStatusInOrderByRequestTimeDesc(user, activeStatuses);
-    }
-
     /**
      * Get all requests for a specific user with pagination
      * @param user The user to get requests for
@@ -306,22 +315,5 @@ public class RequestService {
     @Transactional(readOnly = true)
     public Page<Request> getUserRequests(User user, Pageable pageable) {
         return requestRepository.findByUser(user, pageable);
-    }
-    
-    /**
-     * Get active requests for a specific user with pagination
-     * @param user The user to get active requests for
-     * @param pageable Pagination information
-     * @return Page of user's active requests
-     */
-    @Transactional(readOnly = true)
-    public Page<Request> getActiveUserRequests(User user, Pageable pageable) {
-        List<RequestStatus> activeStatuses = Arrays.asList(
-            RequestStatus.PENDING,
-            RequestStatus.DISPATCHED,
-            RequestStatus.IN_PROGRESS,
-            RequestStatus.ARRIVED
-        );
-        return requestRepository.findByUserAndStatusIn(user, activeStatuses, pageable);
     }
 }

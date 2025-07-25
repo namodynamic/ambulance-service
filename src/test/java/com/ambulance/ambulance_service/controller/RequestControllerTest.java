@@ -12,11 +12,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.*;
@@ -74,7 +79,7 @@ class RequestControllerTest {
     @Test
     void testCreateRequest_Success() throws Exception {
         // Arrange
-        when(requestService.createRequest(any(AmbulanceRequestDto.class), any(User.class))).thenReturn(mockRequest);
+        when(requestService.createRequest(any(AmbulanceRequestDto.class), any())).thenReturn(mockRequest);
 
         // Act & Assert
         mockMvc.perform(post("/api/requests")
@@ -89,7 +94,7 @@ class RequestControllerTest {
                 .andExpect(jsonPath("$.requestTime", notNullValue()))
                 .andExpect(jsonPath("$.dispatchTime", notNullValue()));
 
-        verify(requestService, times(1)).createRequest(any(AmbulanceRequestDto.class), any(User.class));
+        verify(requestService, times(1)).createRequest(any(AmbulanceRequestDto.class), any());
     }
 
     @Test
@@ -109,7 +114,7 @@ class RequestControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.userContact", containsString("Invalid phone number format")));
 
-        verify(requestService, never()).createRequest(any(AmbulanceRequestDto.class), any(User.class));
+        verify(requestService, never()).createRequest(any(AmbulanceRequestDto.class), any());
     }
 
     @Test
@@ -127,23 +132,21 @@ class RequestControllerTest {
                 .andExpect(jsonPath("$.userContact", containsString("required")))
                 .andExpect(jsonPath("$.location", containsString("required")));
 
-        verify(requestService, never()).createRequest(any(AmbulanceRequestDto.class), any(User.class));
+        verify(requestService, never()).createRequest(any(AmbulanceRequestDto.class), any());
     }
 
     @Test
     void testCreateRequest_NoAvailableAmbulance() throws Exception {
-        // Arrange
-        when(requestService.createRequest(any(AmbulanceRequestDto.class), any(User.class)))
+        when(requestService.createRequest(any(AmbulanceRequestDto.class), any()))
                 .thenThrow(new RuntimeException(new NoAvailableAmbulanceException("No ambulance available")));
 
-        // Act & Assert - Changed from isInternalServerError() to isServiceUnavailable()
         mockMvc.perform(post("/api/requests")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequestDto)))
-                .andExpect(status().isServiceUnavailable()) // Updated to 503
-                .andExpect(jsonPath("$.error", is("No ambulance available"))); // Added response body check
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error", is("No ambulance available")));
 
-        verify(requestService, times(1)).createRequest(any(AmbulanceRequestDto.class), any(User.class));
+        verify(requestService, times(1)).createRequest(any(AmbulanceRequestDto.class), any());
     }
 
     @Test
@@ -206,17 +209,26 @@ class RequestControllerTest {
         updatedRequest.setId(1L);
         updatedRequest.setStatus(RequestStatus.COMPLETED);
 
-        when(requestService.updateRequestStatus(1L, RequestStatus.COMPLETED))
+        // Mock the service call with all parameters including the notes
+        when(requestService.updateRequestStatus(1L, RequestStatus.COMPLETED, null))
                 .thenReturn(updatedRequest);
+
+        // Create a StatusUpdateRequest object to send in the request body
+        RequestController.StatusUpdateRequest statusUpdate = new RequestController.StatusUpdateRequest();
+        statusUpdate.setStatus(RequestStatus.COMPLETED);
+        statusUpdate.setNotes(null);
 
         // Act & Assert
         mockMvc.perform(put("/api/requests/1/status")
-                        .param("status", "COMPLETED"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(statusUpdate)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.status", is("COMPLETED")));
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
 
-        verify(requestService, times(1)).updateRequestStatus(1L, RequestStatus.COMPLETED);
+        // Verify the service was called with the correct parameters
+        verify(requestService, times(1))
+                .updateRequestStatus(1L, RequestStatus.COMPLETED, null);
     }
 
     @Test

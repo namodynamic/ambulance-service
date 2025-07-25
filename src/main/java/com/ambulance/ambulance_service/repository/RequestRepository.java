@@ -64,4 +64,18 @@ public interface RequestRepository extends JpaRepository<Request, Long> {
             @Param("status") RequestStatus status,
             Pageable pageable
     );
+
+    /**
+     * Count all requests with a specific status
+     * @param status The status to count
+     * @return The count of requests with the given status
+     */
+    long countByStatus(RequestStatus status);
+    
+    /**
+     * Count all requests where status is in the given list
+     * @param statuses List of statuses to include in the count
+     * @return The count of matching requests
+     */
+    long countByStatusIn(List<RequestStatus> statuses);
 }

@@ -94,8 +94,6 @@ class AmbulanceServiceTest {
         when(ambulanceRepository.findById(1L)).thenReturn(Optional.of(availableAmbulance1));
         when(ambulanceRepository.findById(2L)).thenReturn(Optional.of(availableAmbulance2));
         when(ambulanceRepository.save(any(Ambulance.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(ambulanceRepository.findFirstByAvailability(AvailabilityStatus.AVAILABLE))
-                .thenReturn(Optional.empty());
 
         // Act - Initialize service
         ambulanceService.init();
@@ -153,17 +151,20 @@ class AmbulanceServiceTest {
     @Test
     void testGetAvailableAmbulances_FiltersCorrectly() {
         // Arrange
-        List<Ambulance> availableOnly = Arrays.asList(availableAmbulance1, availableAmbulance2);
-        when(ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE))
-                .thenReturn(availableOnly);
+        List<Ambulance> allAmbulances = Arrays.asList(availableAmbulance1, availableAmbulance2, dispatchedAmbulance, maintenanceAmbulance);
+        when(ambulanceRepository.findAll()).thenReturn(allAmbulances);
+
+        // Initialize the service to load ambulances into the queue
+        ambulanceService.init();
 
         // Act
         List<Ambulance> result = ambulanceService.getAvailableAmbulances();
 
         // Assert
         assertEquals(2, result.size(), "Should return only available ambulances");
+        assertTrue(result.contains(availableAmbulance1) && result.contains(availableAmbulance2),
+                "Should contain both available ambulances");
         assertTrue(result.stream().allMatch(a -> a.getAvailability() == AvailabilityStatus.AVAILABLE),
                 "All returned ambulances should be available");
-        verify(ambulanceRepository, times(1)).findByAvailability(AvailabilityStatus.AVAILABLE);
     }
 }

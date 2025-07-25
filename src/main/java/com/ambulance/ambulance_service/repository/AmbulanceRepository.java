@@ -17,4 +17,6 @@ public interface AmbulanceRepository extends JpaRepository<Ambulance, Long> {
     Optional<Ambulance> findFirstAvailableAmbulance();
 
     Optional<Ambulance> findFirstByAvailability(AvailabilityStatus availabilityStatus);
+
+    long countByAvailability(AvailabilityStatus status);
 }

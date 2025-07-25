@@ -9,4 +9,10 @@ import java.util.Optional;
 @Repository
 public interface PatientRepository extends JpaRepository<Patient, Long> {
     Optional<Patient> findByContact(String contact);
+    
+    /**
+     * Count all patients in the system
+     * @return The total number of patients
+     */
+    long count();
 }

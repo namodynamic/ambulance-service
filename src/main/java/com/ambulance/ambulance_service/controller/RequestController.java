@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
@@ -67,21 +68,10 @@ public class RequestController {
             com.ambulance.ambulance_service.entity.User user = null;
             if (authentication != null && authentication.isAuthenticated() && 
                 authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.User) {
-                
                 org.springframework.security.core.userdetails.User principal = 
                     (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
-                
-                // Get the user from the database
                 user = userRepository.findByUsername(principal.getUsername())
-                    .orElse(null);
-                
-                if (user != null) {
-                    // For authenticated users, use their details from the database
-                    // Only set the username from the user object, keep the contact from the request
-                    requestDto.setUserName(user.getUsername());
-                    // Don't override userContact with email to avoid validation issues
-                    // The frontend should provide a valid phone number in the request
-                }
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getUsername()));
             }
 
             Request request = requestService.createRequest(requestDto, user);
@@ -90,6 +80,12 @@ public class RequestController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof NoAvailableAmbulanceException) {
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body(Map.of("error", cause.getMessage()));
+            }
+            
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "An unexpected error occurred: " + e.getMessage()));
