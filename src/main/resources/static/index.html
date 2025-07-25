@@ -8,29 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* Add this to your existing styles */
-        .form-group input.error {
-            border-color: #ff4444;
-            box-shadow: 0 0 0 2px rgba(255, 68, 68, 0.2);
-        }
-
-        .form-group small {
-            display: block;
-            margin-top: 4px;
-            color: #666;
-            font-size: 0.85em;
-        }
-
-        .form-group input:invalid {
-            border-color: #ffdc73;
-        }
-
-        .form-group input:focus:invalid {
-            border-color: #ffbb33;
-            box-shadow: 0 0 0 2px rgba(255, 187, 51, 0.2);
-        }
-    </style>
 </head>
 <body>
 <div class="app-container">
@@ -62,13 +39,6 @@
                         </button>
                         <p class="emergency-note">Available 24/7 - Login required for tracking</p>
                     </div>
-
-                    <!-- Less prominent admin access -->
-<!--                    <div class="secondary-actions">-->
-<!--                        <a href="#" onclick="showPage('admin-login')" class="admin-link">-->
-<!--                            Administrator Login-->
-<!--                        </a>-->
-<!--                    </div>-->
                     <!-- User and Admin access -->
                     <div class="secondary-actions">
                         <a href="#" onclick="showPage('user-login')" class="admin-link">
@@ -398,7 +368,6 @@
                 </div>
                 <nav class="nav">
                     <a href="#" class="nav-link" onclick="showPage('request-page')">New Request</a>
-                    <a href="#" class="nav-link" onclick="showPage('user-dashboard')">My Dashboard</a>
                     <div class="user-info">
                         <span id="user-email" class="user-email"></span>
                         <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
@@ -644,8 +613,9 @@
                 <h4>Quick Links</h4>
                 <ul>
                     <li><a href="#" onclick="showPage('request-page')">Request Ambulance</a></li>
-                    <li><a href="#" onclick="showPage('admin-login')">Admin Login</a></li>
-                    <li><a href="/">Home</a></li>
+                    <li><a href="#" onclick="showPage('admin-dashboard')">Admin Dashboard</a></li>
+                    <li><a href="#" onclick="showPage('user-dashboard')">User Dashboard</a></li>
+                    <li><a href="#" onclick="showPage('landing-page')">Home</a></li>
                     <li><a href="#about">About Us</a></li>
                 </ul>
             </div>
@@ -662,11 +632,20 @@
     </footer>
 </div>
 
+
+<script src="js/data.js" defer></script>
 <script type="module" src="js/api.js"></script>
-<script src="js/data.js"></script>
-<script src="js/admin.js" defer></script>
-<script src="js/main.js"></script>
-<script src="/js/user-dashboard.js"></script>
+<script src="js/dashboard.js" defer></script>
+<script src="js/main.js" defer></script>
 <script src="js/auth.js"></script>
+
+
+
+<!--<script type="module" src="js/api.js"></script>-->
+<!--<script src="js/data.js" defer></script>-->
+<!--<script src="js/admin.js" defer></script>-->
+<!--<script src="js/main.js" defer></script>-->
+<!--<script src="js/user-dashboard.js" defer></script>-->
+<!--<script src="js/auth.js"></script>-->
 </body>
 </html>
