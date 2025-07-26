@@ -35,6 +35,9 @@ public class Request {
     @Column(name = "emergency_description")
     private String emergencyDescription;
 
+    @Column(name = "medical_notes")
+    private String medicalNotes;
+
     @Column(name = "request_time", nullable = false)
     private LocalDateTime requestTime;
 
@@ -49,7 +52,7 @@ public class Request {
     @Enumerated(EnumType.STRING)
     private RequestStatus status;
 
-    @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<RequestStatusHistory> statusHistory = new ArrayList<>();
 
@@ -107,6 +110,9 @@ public class Request {
 
     public String getEmergencyDescription() { return emergencyDescription; }
     public void setEmergencyDescription(String emergencyDescription) { this.emergencyDescription = emergencyDescription; }
+
+    public String getMedicalNotes() { return medicalNotes; }
+    public void setMedicalNotes(String medicalNotes) { this.medicalNotes = medicalNotes; }
 
     public LocalDateTime getRequestTime() { return requestTime; }
     public void setRequestTime(LocalDateTime requestTime) { this.requestTime = requestTime; }

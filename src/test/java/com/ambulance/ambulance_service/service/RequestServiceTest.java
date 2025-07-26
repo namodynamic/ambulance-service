@@ -51,7 +51,8 @@ class RequestServiceTest {
                 "John Doe",
                 "+1234567890",
                 "123 Emergency Street",
-                "Chest pain"
+                "Chest pain",
+                "Test medical notes"
         );
 
         initialRequest = new Request(
@@ -183,7 +184,8 @@ class RequestServiceTest {
                 "John Doe",
                 "invalid-phone",
                 "123 Emergency Street",
-                "Emergency"
+                "Emergency",
+                ""
         );
 
         // This test would be handled by @Valid annotation in controller

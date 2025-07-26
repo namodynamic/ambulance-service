@@ -77,7 +77,8 @@ class AmbulanceServiceIntegrationTest {
                 "Emergency Patient",
                 "+1234567890",
                 "123 Emergency Street",
-                "Heart attack symptoms"
+                "Heart attack symptoms",
+                "Test medical notes"
         );
 
         Request createdRequest = requestService.createRequest(requestDto, testUser);
@@ -157,9 +158,9 @@ class AmbulanceServiceIntegrationTest {
         testUser.setRole(Role.USER);
 
         // Test: Create 3 requests (more than available ambulances)
-        AmbulanceRequestDto request1 = new AmbulanceRequestDto("Patient 1", "+1111111111", "Location 1", "Emergency 1");
-        AmbulanceRequestDto request2 = new AmbulanceRequestDto("Patient 2", "+2222222222", "Location 2", "Emergency 2");
-        AmbulanceRequestDto request3 = new AmbulanceRequestDto("Patient 3", "+3333333333", "Location 3", "Emergency 3");
+        AmbulanceRequestDto request1 = new AmbulanceRequestDto("Patient 1", "+1111111111", "Location 1", "Emergency 1", "Notes 1");
+        AmbulanceRequestDto request2 = new AmbulanceRequestDto("Patient 2", "+2222222222", "Location 2", "Emergency 2", "Notes 2");
+        AmbulanceRequestDto request3 = new AmbulanceRequestDto("Patient 3", "+3333333333", "Location 3", "Emergency 3", "Notes 3");
 
         // First two requests should be dispatched
         Request createdRequest1 = requestService.createRequest(request1, testUser);
@@ -198,8 +199,8 @@ class AmbulanceServiceIntegrationTest {
         // Create multiple requests for same patient
         String patientContact = "+1234567890";
 
-        AmbulanceRequestDto request1 = new AmbulanceRequestDto("John Doe", patientContact, "Home", "First emergency");
-        AmbulanceRequestDto request2 = new AmbulanceRequestDto("John Doe", patientContact, "Work", "Second emergency");
+        AmbulanceRequestDto request1 = new AmbulanceRequestDto("John Doe", patientContact, "Home", "First emergency", "Notes 1");
+        AmbulanceRequestDto request2 = new AmbulanceRequestDto("John Doe", patientContact, "Work", "Second emergency", "Notes 2");
 
         Request createdRequest1 = requestService.createRequest(request1, testUser);
 

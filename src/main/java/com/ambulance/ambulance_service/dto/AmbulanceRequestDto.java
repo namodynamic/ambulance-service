@@ -16,14 +16,17 @@ public class AmbulanceRequestDto {
 
     private String emergencyDescription;
 
+    private String medicalNotes;
+
     // Constructors
     public AmbulanceRequestDto() {}
 
-    public AmbulanceRequestDto(String userName, String userContact, String location, String emergencyDescription) {
+    public AmbulanceRequestDto(String userName, String userContact, String location, String emergencyDescription, String medicalNotes) {
         this.userName = userName;
         this.userContact = userContact;
         this.location = location;
         this.emergencyDescription = emergencyDescription;
+        this.medicalNotes = medicalNotes;
     }
 
     // Getters and Setters
@@ -38,4 +41,7 @@ public class AmbulanceRequestDto {
 
     public String getEmergencyDescription() { return emergencyDescription; }
     public void setEmergencyDescription(String emergencyDescription) { this.emergencyDescription = emergencyDescription; }
+
+    public String getMedicalNotes() { return medicalNotes; }
+    public void setMedicalNotes(String medicalNotes) { this.medicalNotes = medicalNotes; }
 }

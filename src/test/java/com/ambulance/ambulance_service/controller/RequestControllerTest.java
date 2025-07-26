@@ -56,7 +56,8 @@ class RequestControllerTest {
                 "John Doe",
                 "+1234567890",
                 "123 Emergency Street",
-                "Chest pain"
+                "Chest pain",
+                "Patient has a history of heart disease"
         );
 
         mockRequest = new Request(
@@ -104,7 +105,8 @@ class RequestControllerTest {
                 "John Doe",
                 "invalid-phone",
                 "123 Emergency Street",
-                "Emergency"
+                "Emergency",
+                "Patient has a history of heart disease"
         );
 
         // Act & Assert
@@ -122,6 +124,7 @@ class RequestControllerTest {
         // Arrange - Missing required fields
         AmbulanceRequestDto invalidDto = new AmbulanceRequestDto();
         invalidDto.setEmergencyDescription("Emergency"); // Only set optional field
+        invalidDto.setMedicalNotes("Patient has a history of heart disease"); // Set medical notes
 
         // Act & Assert
         mockMvc.perform(post("/api/requests")

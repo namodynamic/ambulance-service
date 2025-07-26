@@ -66,7 +66,8 @@ class PerformanceTest {
                                     "Patient " + threadId + "-" + j,
                                     "+12345678" + threadId + j,
                                     "Location " + threadId + "-" + j,
-                                    "Emergency " + threadId + "-" + j
+                                    "Emergency " + threadId + "-" + j,
+                                    "Medical notes for request " + threadId + "-" + j
                             );
                             requestService.createRequest(requestDto, testUser);
                             successCount.incrementAndGet();

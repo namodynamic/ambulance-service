@@ -1,6 +1,7 @@
 package com.ambulance.ambulance_service.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
@@ -19,7 +20,7 @@ public class RequestStatusHistory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "request_id", nullable = false)
-    @JsonIgnore
+    @JsonBackReference
     private Request request;
 
     @Enumerated(EnumType.STRING)
