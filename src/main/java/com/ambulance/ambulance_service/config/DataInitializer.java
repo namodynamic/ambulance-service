@@ -92,7 +92,7 @@ public class DataInitializer implements CommandLineRunner {
         for (int i = 1; i <= 5; i++) {
             Ambulance ambulance = new Ambulance();
             ambulance.setCurrentLocation("Location " + i);
-            ambulance.setAvailability(i % 2 == 0 ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.DISPATCHED);
+            ambulance.setAvailability(AvailabilityStatus.AVAILABLE);
             ambulanceRepository.save(ambulance);
         }
     }

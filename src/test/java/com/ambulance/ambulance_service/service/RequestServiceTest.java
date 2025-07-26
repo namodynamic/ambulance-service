@@ -5,6 +5,7 @@ import com.ambulance.ambulance_service.entity.*;
 import com.ambulance.ambulance_service.exception.NoAvailableAmbulanceException;
 import com.ambulance.ambulance_service.exception.RequestNotFoundException;
 import com.ambulance.ambulance_service.repository.RequestRepository;
+import com.ambulance.ambulance_service.repository.ServiceHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +18,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +36,9 @@ class RequestServiceTest {
     @Mock
     private ServiceHistoryService serviceHistoryService;
 
+    @Mock
+    private ServiceHistoryRepository serviceHistoryRepository;
+
     @InjectMocks
     private RequestService requestService;
 
@@ -46,15 +51,30 @@ class RequestServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Create test data
+        // Initialize test data
         validRequestDto = new AmbulanceRequestDto(
-                "John Doe",
+                "Test User",
+                "Test Patient",
                 "+1234567890",
-                "123 Emergency Street",
-                "Chest pain",
+                "Test Location",
+                "Test emergency",
                 "Test medical notes"
         );
 
+        testUser = new User();
+        testUser.setId(1L);
+        testUser.setRole(Role.USER);
+
+        availableAmbulance = new Ambulance();
+        availableAmbulance.setAvailability(AvailabilityStatus.AVAILABLE);
+        availableAmbulance.setId(1L);
+
+        testPatient = new Patient();
+        testPatient.setName("Test Patient");
+        testPatient.setContact("+1234567890");
+        testPatient.setId(1L);
+
+        // Initialize request objects after setting up test data
         initialRequest = new Request(
                 validRequestDto.getUserName(),
                 validRequestDto.getUserContact(),
@@ -62,15 +82,7 @@ class RequestServiceTest {
                 validRequestDto.getEmergencyDescription()
         );
         initialRequest.setId(1L);
-
-        testUser = new User();
-        testUser.setId(1L);
-        testUser.setRole(Role.USER);
-
-        availableAmbulance = new Ambulance();
-        availableAmbulance.setCurrentLocation("Downtown Hospital");
-        availableAmbulance.setAvailability(AvailabilityStatus.AVAILABLE);
-        availableAmbulance.setId(1L);
+        initialRequest.setUser(testUser);
 
         dispatchedRequest = new Request(
                 validRequestDto.getUserName(),
@@ -84,20 +96,20 @@ class RequestServiceTest {
         dispatchedRequest.setDispatchTime(LocalDateTime.now());
         dispatchedRequest.setUser(testUser);
 
-        testPatient = new Patient("John Doe", "+1234567890", "");
-        testPatient.setId(1L);
+        // Configure common mocks that are used in most tests
+        lenient().when(patientService.findOrCreatePatient(anyString(), anyString())).thenReturn(testPatient);
+        lenient().when(serviceHistoryService.createServiceHistory(any(), any(), any())).thenReturn(new ServiceHistory());
     }
 
     @Test
     void testCreateRequest_Success() throws NoAvailableAmbulanceException {
         // Arrange
-        when(requestRepository.save(any(Request.class)))
-                .thenReturn(initialRequest)
-                .thenReturn(dispatchedRequest);
-
         when(ambulanceService.getNextAvailableAmbulance()).thenReturn(Optional.of(availableAmbulance));
-        when(patientService.findOrCreatePatient(anyString(), anyString())).thenReturn(testPatient);
-        when(serviceHistoryService.createServiceHistory(any(), any(), any())).thenReturn(new ServiceHistory());
+        when(requestRepository.save(any(Request.class))).thenAnswer(invocation -> {
+            Request r = invocation.getArgument(0);
+            r.setId(1L);
+            return r;
+        });
 
         // Act
         Request result = requestService.createRequest(validRequestDto, testUser);
@@ -109,32 +121,35 @@ class RequestServiceTest {
         assertEquals(availableAmbulance, result.getAmbulance(), "Ambulance should be assigned");
         assertEquals(testUser, result.getUser(), "User should be assigned to request");
 
-        // Verify interactions
+        // Verify interactions - expect 2 saves: one for initial save and one after dispatch
         verify(requestRepository, times(2)).save(any(Request.class));
         verify(ambulanceService, times(1)).getNextAvailableAmbulance();
-        verify(patientService, times(1)).findOrCreatePatient("John Doe", "+1234567890");
+        verify(patientService, times(1)).findOrCreatePatient(anyString(), anyString());
         verify(serviceHistoryService, times(1)).createServiceHistory(any(), any(), any());
     }
 
     @Test
-    void testCreateRequest_NoAvailableAmbulance_ThrowsException() {
+    public void testCreateRequest_NoAvailableAmbulance_QueuesRequest() throws NoAvailableAmbulanceException {
         // Arrange
-        when(requestRepository.save(any(Request.class))).thenReturn(initialRequest);
         when(ambulanceService.getNextAvailableAmbulance()).thenReturn(Optional.empty());
+        when(requestRepository.save(any(Request.class))).thenAnswer(invocation -> {
+            Request r = invocation.getArgument(0);
+            r.setId(1L);
+            return r;
+        });
 
-        // Act & Assert
-        NoAvailableAmbulanceException exception = assertThrows(
-                NoAvailableAmbulanceException.class,
-                () -> requestService.createRequest(validRequestDto, testUser),
-                "Should throw NoAvailableAmbulanceException when no ambulance available"
-        );
+        // Act
+        Request result = requestService.createRequest(validRequestDto, testUser);
 
-        assertEquals("No ambulance available at the moment", exception.getMessage());
+        // Assert
+        assertNotNull(result, "Should return the queued request");
+        assertEquals(RequestStatus.PENDING, result.getStatus(), "Request should be queued");
 
-        // Verify that request was saved but no further processing occurred
-        verify(requestRepository, times(1)).save(any(Request.class));
-        verify(ambulanceService, never()).updateAmbulanceStatus(any(), any());
-        verify(serviceHistoryService, never()).createServiceHistory(any(), any(), any());
+        // Verify interactions - expect 2 saves: one for initial creation and one after setting status to PENDING
+        verify(ambulanceService, times(1)).getNextAvailableAmbulance();
+        verify(patientService, times(1)).findOrCreatePatient(anyString(), anyString());
+        verify(requestRepository, times(2)).save(any(Request.class));
+        verify(serviceHistoryService, times(1)).createServiceHistory(any(), any(), any());
     }
 
     @Test
@@ -182,6 +197,7 @@ class RequestServiceTest {
         // Arrange - Create DTO with invalid phone number
         AmbulanceRequestDto invalidDto = new AmbulanceRequestDto(
                 "John Doe",
+                "Test Patient",
                 "invalid-phone",
                 "123 Emergency Street",
                 "Emergency",

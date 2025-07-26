@@ -63,7 +63,8 @@ class PerformanceTest {
                     for (int j = 0; j < requestsPerThread; j++) {
                         try {
                             AmbulanceRequestDto requestDto = new AmbulanceRequestDto(
-                                    "Patient " + threadId + "-" + j,
+                                    "Test User",
+                                    "Test Patient",
                                     "+12345678" + threadId + j,
                                     "Location " + threadId + "-" + j,
                                     "Emergency " + threadId + "-" + j,

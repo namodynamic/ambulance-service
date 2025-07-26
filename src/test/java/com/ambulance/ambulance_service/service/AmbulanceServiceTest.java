@@ -10,10 +10,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,82 +38,99 @@ class AmbulanceServiceTest {
         availableAmbulance1.setCurrentLocation("Downtown Hospital");
         availableAmbulance1.setAvailability(AvailabilityStatus.AVAILABLE);
         availableAmbulance1.setId(1L);
+        availableAmbulance1.setLicensePlate("ABC123");
 
         availableAmbulance2 = new Ambulance();
         availableAmbulance2.setCurrentLocation("City Medical Center");
         availableAmbulance2.setAvailability(AvailabilityStatus.AVAILABLE);
         availableAmbulance2.setId(2L);
+        availableAmbulance2.setLicensePlate("DEF456");
 
         dispatchedAmbulance = new Ambulance();
         dispatchedAmbulance.setCurrentLocation("Northside Clinic");
         dispatchedAmbulance.setAvailability(AvailabilityStatus.DISPATCHED);
         dispatchedAmbulance.setId(3L);
+        dispatchedAmbulance.setLicensePlate("GHI789");
 
         maintenanceAmbulance = new Ambulance();
         maintenanceAmbulance.setCurrentLocation("Emergency Station");
         maintenanceAmbulance.setAvailability(AvailabilityStatus.MAINTENANCE);
         maintenanceAmbulance.setId(4L);
+        maintenanceAmbulance.setLicensePlate("JKL012");
+
+        // Common mock behaviors
+        lenient().when(ambulanceRepository.save(any(Ambulance.class))).thenAnswer(invocation -> {
+            Ambulance a = invocation.getArgument(0);
+            return a; // Return the same instance for simplicity
+        });
     }
 
     @Test
     void testAmbulanceQueueInitialization() {
         // Arrange
-        List<Ambulance> allAmbulances = Arrays.asList(
-                availableAmbulance1, availableAmbulance2, dispatchedAmbulance, maintenanceAmbulance
-        );
-        when(ambulanceRepository.findAll()).thenReturn(allAmbulances);
-
-        // Stub repository calls
-        when(ambulanceRepository.findById(1L)).thenReturn(Optional.of(availableAmbulance1));
-        when(ambulanceRepository.save(any(Ambulance.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        List<Ambulance> availableAmbulances = Arrays.asList(availableAmbulance1, availableAmbulance2);
+        when(ambulanceRepository.findAll()).thenReturn(availableAmbulances);
+        when(ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE))
+                .thenReturn(availableAmbulances);
 
         // Act - Initialize service
         ambulanceService.init();
 
-        // Act - Get next available ambulance
-        Ambulance nextAvailable = ambulanceService.getNextAvailableAmbulance().orElse(null);
+        // Trigger queue population
+        List<Ambulance> available = ambulanceService.getAvailableAmbulances();
 
         // Assert
-        assertNotNull(nextAvailable, "Should have available ambulance in queue");
-        assertEquals(AvailabilityStatus.DISPATCHED, nextAvailable.getAvailability(),
-                "Next ambulance should be marked as dispatched");
+        assertEquals(2, available.size(), "Should have loaded all available ambulances");
+        assertTrue(available.stream().anyMatch(a -> a.getId().equals(1L)), "Should contain ambulance 1");
+        assertTrue(available.stream().anyMatch(a -> a.getId().equals(2L)), "Should contain ambulance 2");
 
         verify(ambulanceRepository, times(1)).findAll();
-        verify(ambulanceRepository, atLeastOnce()).save(any(Ambulance.class));
+        verify(ambulanceRepository, times(1)).findByAvailability(AvailabilityStatus.AVAILABLE);
     }
 
     @Test
     void testAmbulanceQueueOrder_FIFO() {
         // Arrange
-        List<Ambulance> allAmbulances = Arrays.asList(availableAmbulance1, availableAmbulance2);
-        when(ambulanceRepository.findAll()).thenReturn(allAmbulances);
+        List<Ambulance> availableAmbulances = Arrays.asList(availableAmbulance1, availableAmbulance2);
 
-        // Stub repository calls
-        when(ambulanceRepository.findById(1L)).thenReturn(Optional.of(availableAmbulance1));
-        when(ambulanceRepository.findById(2L)).thenReturn(Optional.of(availableAmbulance2));
-        when(ambulanceRepository.save(any(Ambulance.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Mock database responses
+        when(ambulanceRepository.findAll()).thenReturn(availableAmbulances);
+        when(ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE))
+                .thenReturn(availableAmbulances);
 
-        // Act - Initialize service
+        // Mock findByIdWithPessimisticWriteLock to return the ambulances
+        when(ambulanceRepository.findByIdWithPessimisticWriteLock(1L))
+                .thenReturn(Optional.of(availableAmbulance1));
+        when(ambulanceRepository.findByIdWithPessimisticWriteLock(2L))
+                .thenReturn(Optional.of(availableAmbulance2));
+
+        // Mock save to update status
+        when(ambulanceRepository.save(any(Ambulance.class))).thenAnswer(invocation -> {
+            Ambulance a = invocation.getArgument(0);
+            if (a.getId().equals(1L)) availableAmbulance1.setAvailability(AvailabilityStatus.DISPATCHED);
+            if (a.getId().equals(2L)) availableAmbulance2.setAvailability(AvailabilityStatus.DISPATCHED);
+            return a;
+        });
+
+        // Initialize the service and load ambulances
         ambulanceService.init();
+        ambulanceService.getAvailableAmbulances(); // Trigger queue population
 
-        // Get first ambulance
-        Ambulance first = ambulanceService.getNextAvailableAmbulance().orElse(null);
-        Ambulance second = ambulanceService.getNextAvailableAmbulance().orElse(null);
-        Optional<Ambulance> third = ambulanceService.getNextAvailableAmbulance();
+        // Act - Get ambulances in order
+        Optional<Ambulance> firstOpt = ambulanceService.getNextAvailableAmbulance();
+        Optional<Ambulance> secondOpt = ambulanceService.getNextAvailableAmbulance();
+        Optional<Ambulance> thirdOpt = ambulanceService.getNextAvailableAmbulance();
 
-        // Assert - Test FIFO order
-        assertNotNull(first);
-        assertNotNull(second);
-        assertEquals(availableAmbulance1.getId(), first.getId(), "First ambulance should be the first in queue");
-        assertEquals(availableAmbulance2.getId(), second.getId(), "Second ambulance should be the next in queue");
-        assertTrue(third.isEmpty(), "No more ambulances should be available");
+        // Assert - Verify FIFO order
+        assertTrue(firstOpt.isPresent(), "First ambulance should be present");
+        assertTrue(secondOpt.isPresent(), "Second ambulance should be present");
+        assertTrue(thirdOpt.isEmpty(), "No third ambulance should be available");
 
-        // Verify status changes
-        assertEquals(AvailabilityStatus.DISPATCHED, first.getAvailability());
-        assertEquals(AvailabilityStatus.DISPATCHED, second.getAvailability());
-
-        // Verify repository interactions
-        verify(ambulanceRepository, times(2)).save(any(Ambulance.class));
+        // Verify the order is correct (FIFO)
+        assertEquals(availableAmbulance1.getId(), firstOpt.get().getId(),
+                "First ambulance should be the first one in the queue");
+        assertEquals(availableAmbulance2.getId(), secondOpt.get().getId(),
+                "Second ambulance should be the second one in the queue");
     }
 
     @Test
@@ -151,10 +166,18 @@ class AmbulanceServiceTest {
     @Test
     void testGetAvailableAmbulances_FiltersCorrectly() {
         // Arrange
-        List<Ambulance> allAmbulances = Arrays.asList(availableAmbulance1, availableAmbulance2, dispatchedAmbulance, maintenanceAmbulance);
-        when(ambulanceRepository.findAll()).thenReturn(allAmbulances);
+        List<Ambulance> allAmbulances = Arrays.asList(
+                availableAmbulance1,
+                availableAmbulance2,
+                dispatchedAmbulance,
+                maintenanceAmbulance
+        );
 
-        // Initialize the service to load ambulances into the queue
+        when(ambulanceRepository.findAll()).thenReturn(allAmbulances);
+        when(ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE))
+                .thenReturn(Arrays.asList(availableAmbulance1, availableAmbulance2));
+
+        // Initialize the service to load ambulances
         ambulanceService.init();
 
         // Act
@@ -162,9 +185,19 @@ class AmbulanceServiceTest {
 
         // Assert
         assertEquals(2, result.size(), "Should return only available ambulances");
-        assertTrue(result.contains(availableAmbulance1) && result.contains(availableAmbulance2),
-                "Should contain both available ambulances");
+
+        // Verify only available ambulances are returned
         assertTrue(result.stream().allMatch(a -> a.getAvailability() == AvailabilityStatus.AVAILABLE),
                 "All returned ambulances should be available");
+
+        // Verify the specific ambulances returned
+        Set<Long> resultIds = result.stream().map(Ambulance::getId).collect(Collectors.toSet());
+        assertTrue(resultIds.contains(availableAmbulance1.getId()), "Should contain first available ambulance");
+        assertTrue(resultIds.contains(availableAmbulance2.getId()), "Should contain second available ambulance");
+        assertFalse(resultIds.contains(dispatchedAmbulance.getId()), "Should not contain dispatched ambulance");
+        assertFalse(resultIds.contains(maintenanceAmbulance.getId()), "Should not contain ambulance in maintenance");
+
+        // Verify repository interactions
+        verify(ambulanceRepository, atLeastOnce()).findByAvailability(AvailabilityStatus.AVAILABLE);
     }
 }

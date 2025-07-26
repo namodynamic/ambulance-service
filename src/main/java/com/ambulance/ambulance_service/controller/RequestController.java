@@ -92,6 +92,22 @@ public class RequestController {
         }
     }
 
+    @PostMapping("/{id}/arrived")
+    public ResponseEntity<?> markAmbulanceArrived(
+            @PathVariable Long id,
+            @RequestParam(required = false) String notes) {
+        try {
+            requestService.markAmbulanceArrived(id, notes != null ? notes : "");
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Ambulance marked as arrived");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to update ambulance status: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
     /**
      * Update the status of a request
      * @param id The ID of the request to update
@@ -102,10 +118,10 @@ public class RequestController {
     public ResponseEntity<?> updateRequestStatus(
             @PathVariable Long id,
             @RequestBody StatusUpdateRequest statusUpdate) {
-        
+
         try {
             Request request = requestService.updateRequestStatus(
-                id, 
+                id,
                 statusUpdate.getStatus(),
                 statusUpdate.getNotes()
             );

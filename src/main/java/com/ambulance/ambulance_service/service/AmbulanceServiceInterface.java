@@ -8,7 +8,6 @@ import java.util.Optional;
 
 public interface AmbulanceServiceInterface {
 
-    // Existing methods
     List<Ambulance> getAllAmbulances();
 
     Optional<Ambulance> getAmbulanceById(Long id);
@@ -26,5 +25,4 @@ public interface AmbulanceServiceInterface {
 
     long countAmbulancesByStatus(AvailabilityStatus status);
 
-    // Other methods as needed...
 }

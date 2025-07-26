@@ -53,11 +53,12 @@ class RequestControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(requestController).build();
 
         validRequestDto = new AmbulanceRequestDto(
-                "John Doe",
-                "+1234567890",
-                "123 Emergency Street",
-                "Chest pain",
-                "Patient has a history of heart disease"
+                "John Doe",  // userName
+                "Jane Smith", // patientName
+                "+1234567890", // userContact
+                "123 Emergency Street", // location
+                "Chest pain: Patient has a history of heart disease", // emergencyDescription
+                "" // medicalNotes
         );
 
         mockRequest = new Request(
@@ -103,6 +104,7 @@ class RequestControllerTest {
         // Arrange - Invalid phone number
         AmbulanceRequestDto invalidDto = new AmbulanceRequestDto(
                 "John Doe",
+                "Jane Smith",
                 "invalid-phone",
                 "123 Emergency Street",
                 "Emergency",

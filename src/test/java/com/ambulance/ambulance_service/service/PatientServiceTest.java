@@ -9,6 +9,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -89,7 +91,7 @@ class PatientServiceTest {
     @Test
     void testFindOrCreatePatient_ExistingPatient() {
         // Arrange - Patient already exists
-        when(patientRepository.findByContact("+1987654321")).thenReturn(Optional.of(testPatient));
+        when(patientRepository.findByContact("+1987654321")).thenReturn(List.of(testPatient));
 
         // Act
         Patient result = patientService.findOrCreatePatient("Jane Doe", "+1987654321");
@@ -103,7 +105,7 @@ class PatientServiceTest {
     @Test
     void testFindOrCreatePatient_NewPatient() {
         // Arrange - Patient doesn't exist
-        when(patientRepository.findByContact("+1555666777")).thenReturn(Optional.empty());
+        when(patientRepository.findByContact("+1555666777")).thenReturn(Collections.emptyList());
 
         Patient newPatient = new Patient("New Patient", "+1555666777", "");
         when(patientRepository.save(any(Patient.class))).thenReturn(newPatient);

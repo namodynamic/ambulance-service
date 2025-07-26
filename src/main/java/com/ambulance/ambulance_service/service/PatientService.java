@@ -48,9 +48,9 @@ public class PatientService implements PatientServiceInterface<Patient> {
 
     @Override
     public Patient findOrCreatePatient(String name, String contact) {
-        Optional<Patient> existingPatient = patientRepository.findByContact(contact);
-        if (existingPatient.isPresent()) {
-            return existingPatient.get();
+        List<Patient> patients = patientRepository.findByContact(contact);
+        if (!patients.isEmpty()) {
+            return patients.get(0); // Return the first patient found with this contact
         } else {
             Patient newPatient = new Patient(name, contact, "");
             return patientRepository.save(newPatient);
@@ -59,7 +59,8 @@ public class PatientService implements PatientServiceInterface<Patient> {
 
     @Override
     public Optional<Patient> findPatientByContact(String contact) {
-        return patientRepository.findByContact(contact);
+        List<Patient> patients = patientRepository.findByContact(contact);
+        return patients.isEmpty() ? Optional.empty() : Optional.of(patients.get(0));
     }
 
     @Override

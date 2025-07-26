@@ -17,6 +17,26 @@ A web-based system for requesting and dispatching ambulance services built with 
 2. PostgreSQL 12 or higher
 3. Maven 3.6+ (or use included mvnw)
 
+## Running Tests
+
+To run all tests:
+
+```bash
+./mvnw test
+```
+
+To run a specific test class:
+
+```bash
+./mvnw test -Dtest=ServiceHistoryServiceTest
+```
+
+To run a specific test method:
+
+```bash
+./mvnw test -Dtest=ServiceHistoryServiceTest#testUpdateServiceStatus_ValidTransition
+```
+
 ## Setup Instructions
 
 ### 1. Database Setup

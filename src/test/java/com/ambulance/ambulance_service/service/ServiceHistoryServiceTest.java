@@ -1,6 +1,7 @@
 package com.ambulance.ambulance_service.service;
 
 import com.ambulance.ambulance_service.entity.*;
+import com.ambulance.ambulance_service.exception.EntityNotFoundException;
 import com.ambulance.ambulance_service.repository.ServiceHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,13 +81,16 @@ class ServiceHistoryServiceTest {
         LocalDateTime completionTime = LocalDateTime.now().minusMinutes(5);
         String notes = "Patient transported successfully";
 
+        // First set status to ARRIVED to allow transition to COMPLETED
+        testServiceHistory.setStatus(ServiceStatus.ARRIVED);
+
         when(serviceHistoryRepository.findById(1L)).thenReturn(Optional.of(testServiceHistory));
         when(serviceHistoryRepository.save(any(ServiceHistory.class))).thenAnswer(invocation -> {
             ServiceHistory sh = invocation.getArgument(0);
             return sh;
         });
 
-        // Act
+        // Act - Now this is a valid transition from ARRIVED to COMPLETED
         ServiceHistory result = serviceHistoryService.updateServiceHistory(
                 1L, arrivalTime, completionTime, ServiceStatus.COMPLETED, notes
         );
@@ -95,7 +99,7 @@ class ServiceHistoryServiceTest {
         assertNotNull(result, "Updated service history should be returned");
         assertEquals(arrivalTime, result.getArrivalTime(), "Arrival time should be updated");
         assertEquals(completionTime, result.getCompletionTime(), "Completion time should be updated");
-        assertEquals(ServiceStatus.COMPLETED, result.getStatus(), "Status should be updated");
+        assertEquals(ServiceStatus.COMPLETED, result.getStatus(), "Status should be updated to COMPLETED");
         assertEquals(notes, result.getNotes(), "Notes should be updated");
 
         verify(serviceHistoryRepository, times(1)).findById(1L);
@@ -132,13 +136,13 @@ class ServiceHistoryServiceTest {
         // Arrange
         when(serviceHistoryRepository.findById(999L)).thenReturn(Optional.empty());
 
-        // Act
-        ServiceHistory result = serviceHistoryService.updateServiceHistory(
-                999L, LocalDateTime.now(), null, ServiceStatus.COMPLETED, "Test"
-        );
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () -> {
+            serviceHistoryService.updateServiceHistory(
+                    999L, LocalDateTime.now(), null, ServiceStatus.COMPLETED, "Test"
+            );
+        }, "Should throw EntityNotFoundException for non-existent service history");
 
-        // Assert
-        assertNull(result, "Should return null for non-existent service history");
         verify(serviceHistoryRepository, times(1)).findById(999L);
         verify(serviceHistoryRepository, never()).save(any());
     }
