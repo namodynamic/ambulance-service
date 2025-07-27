@@ -141,17 +141,13 @@
                         <h3>Patient Information</h3>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="patient-name">Patient Name</label>
-                                <input type="text" id="patient-name" name="patientName" placeholder="Patient's full name" required>
+                                <label for="patient-name">Patient's Name (if known)</label>
+                                <input type="text" id="patient-name" name="patientName" placeholder="Leave blank if unknown">
                             </div>
                             <div class="form-group">
-                                <label for="patient-age">Age</label>
-                                <input type="number" id="patient-age" name="patientAge" placeholder="Age" min="0" max="120">
+                                <label for="medical-notes">Medical Notes (Optional)</label>
+                                <textarea id="medical-notes" name="medicalNotes" placeholder="Any relevant medical conditions, allergies, or medications..."></textarea>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="medical-notes">Medical Notes (Optional)</label>
-                            <textarea id="medical-notes" name="medicalNotes" placeholder="Any relevant medical conditions, allergies, or medications..."></textarea>
                         </div>
                     </div>
 
@@ -332,22 +328,55 @@
                     <h2>Create Account</h2>
                     <div id="register-message" class="alert" style="display: none;"></div>
                     <form id="register-form" class="login-form">
-                        <div class="form-group">
-                            <label for="reg-username">Username</label>
-                            <input type="text" id="reg-username" name="username" placeholder="Choose a username" required>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="reg-username">Username <span class="required">*</span></label>
+                                <input type="text" id="reg-username" name="username" placeholder="Choose a username" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="reg-email">Email <span class="required">*</span></label>
+                                <input type="email" id="reg-email" name="email" placeholder="Enter your email" required>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="reg-email">Email</label>
-                            <input type="email" id="reg-email" name="email" placeholder="Enter your email" required>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="reg-first-name">First Name <span class="required">*</span></label>
+                                <input type="text" id="reg-first-name" name="firstName" placeholder="First name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="reg-last-name">Last Name <span class="required">*</span></label>
+                                <input type="text" id="reg-last-name" name="lastName" placeholder="Last name" required>
+                            </div>
                         </div>
+
                         <div class="form-group">
-                            <label for="reg-password">Password</label>
-                            <input type="password" id="reg-password" name="password" placeholder="Create a password" required>
+                            <label for="reg-phone">Phone Number <span class="required">*</span></label>
+                            <input type="tel" id="reg-phone" name="phoneNumber" placeholder="+1 (555) 123-4567" required>
                         </div>
-                        <div class="form-group">
-                            <label for="reg-confirm-password">Confirm Password</label>
-                            <input type="password" id="reg-confirm-password" name="confirmPassword" placeholder="Confirm your password" required>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="reg-password">Password <span class="required">*</span></label>
+                                <input type="password" id="reg-password" name="password"
+                                       placeholder="Create a password (min 8 characters)"
+                                       minlength="8" required>
+                                <small class="form-hint">Must be at least 8 characters long</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="reg-confirm-password">Confirm Password <span class="required">*</span></label>
+                                <input type="password" id="reg-confirm-password"
+                                       name="confirmPassword"
+                                       placeholder="Confirm your password"
+                                       minlength="8" required>
+                            </div>
                         </div>
+
+                        <div class="form-group terms-group">
+                            <input type="checkbox" id="terms" name="terms" required>
+                            <label for="terms">I agree to the <a href="#" onclick="showTerms()">Terms of Service</a> and <a href="#" onclick="showPrivacy()">Privacy Policy</a> <span class="required">*</span></label>
+                        </div>
+
                         <button type="submit" class="btn btn-primary btn-large">Create Account</button>
                     </form>
                     <div class="login-demo">

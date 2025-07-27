@@ -164,7 +164,6 @@ class ApplicationManager {
       "callerName",
       "phone",
       "address",
-      "city",
       "emergencyType",
       "description",
     ];
@@ -181,6 +180,7 @@ class ApplicationManager {
 
     // Prepare request data
     const requestData = {
+      patientName: formData.get("patientName")?.trim() || "",
       userName: formData.get("callerName"),
       userContact: phoneNumber,
       location: `${formData.get("address")}, ${formData.get(
@@ -189,6 +189,7 @@ class ApplicationManager {
       emergencyDescription: `${formData.get("emergencyType")}: ${formData.get(
         "description"
       )}`,
+      medicalNotes: formData.get("medicalNotes") || "",
     };
 
     console.log("Submitting ambulance request:", requestData);
@@ -273,27 +274,46 @@ class ApplicationManager {
     const formData = new FormData(form);
     const messageDiv = document.getElementById("register-message");
 
+    // Basic validation
     const password = formData.get("password");
     const confirmPassword = formData.get("confirmPassword");
+    const termsAccepted = formData.get("terms") === "on";
 
+    // Clear previous messages
+    if (messageDiv) {
+      messageDiv.style.display = "none";
+    }
+
+    // Validate form
     if (password !== confirmPassword) {
-      showRegisterError("Passwords do not match");
+      this.showRegisterError("Passwords do not match");
       return;
     }
 
+    if (password.length < 8) {
+      this.showRegisterError("Password must be at least 8 characters long");
+      return;
+    }
+
+    if (!termsAccepted) {
+      this.showRegisterError("You must accept the terms and conditions");
+      return;
+    }
+
+    // Prepare registration data
     const registerData = {
-      username: formData.get("username"),
-      email: formData.get("email"),
+      username: formData.get("username").trim(),
+      email: formData.get("email").trim(),
       password: password,
-      role: "ROLE_USER",
+      firstName: formData.get("firstName").trim(),
+      lastName: formData.get("lastName").trim(),
+      phoneNumber: formData.get("phoneNumber").trim(),
+      role: "USER", // Default role
+      enabled: true
     };
 
     try {
-      if (messageDiv) {
-        messageDiv.style.display = "none";
-      }
-
-      const response = await fetch(`${API_BASE}/auth/register`, {
+      const response = await fetch(`${this.API_BASE}/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -303,10 +323,12 @@ class ApplicationManager {
 
       if (response.ok) {
         const data = await response.json();
-        showRegisterSuccess("Registration successful! You can now login.");
+        this.showRegisterSuccess("Registration successful! You can now login.");
         form.reset();
+
+        // Auto-redirect to login after 2 seconds
         setTimeout(() => {
-          showPage("user-login");
+          this.showPage("user-login");
         }, 2000);
       } else {
         const errorText = await response.text();
@@ -316,27 +338,31 @@ class ApplicationManager {
         } catch (e) {
           error = { error: errorText };
         }
-        showRegisterError(error.error || "Registration failed");
+        this.showRegisterError(error.error || "Registration failed. Please check your information and try again.");
       }
     } catch (error) {
       console.error("Registration error:", error);
-      showRegisterError("Registration failed. Please try again.");
+      this.showRegisterError("Unable to connect to the server. Please check your connection and try again.");
     }
+  }
 
-    function showRegisterError(message) {
-      if (messageDiv) {
-        messageDiv.textContent = message;
-        messageDiv.className = "alert alert-error";
-        messageDiv.style.display = "block";
-      }
+  showRegisterError(message) {
+    const messageDiv = document.getElementById("register-message");
+    if (messageDiv) {
+      messageDiv.textContent = message;
+      messageDiv.className = "alert alert-error";
+      messageDiv.style.display = "block";
+      messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  }
 
-    function showRegisterSuccess(message) {
-      if (messageDiv) {
-        messageDiv.textContent = message;
-        messageDiv.className = "alert alert-success";
-        messageDiv.style.display = "block";
-      }
+  showRegisterSuccess(message) {
+    const messageDiv = document.getElementById("register-message");
+    if (messageDiv) {
+      messageDiv.textContent = message;
+      messageDiv.className = "alert alert-success";
+      messageDiv.style.display = "block";
+      messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
 
