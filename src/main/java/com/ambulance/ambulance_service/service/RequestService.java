@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -77,16 +76,14 @@ public class RequestService implements RequestServiceInterface {
             : "Unknown";
         
         logger.debug("Finding/creating patient: {}", patientName);
-        Patient patient = patientService.findOrCreatePatient(patientName, requestDto.getUserContact());
-        
-        // Update patient's medical notes if provided
+        // Create or find patient with initial medical notes if provided
+        Patient patient;
         if (requestDto.getMedicalNotes() != null && !requestDto.getMedicalNotes().trim().isEmpty()) {
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String updatedNotes = patient.getMedicalNotes() != null 
-                ? patient.getMedicalNotes() + "\n[" + timestamp + "] " + requestDto.getMedicalNotes().trim()
-                : "[" + timestamp + "] " + requestDto.getMedicalNotes().trim();
-            patient.setMedicalNotes(updatedNotes);
-            patient = patientService.savePatient(patient);
+            String initialNotes = "[" + timestamp + "] " + requestDto.getMedicalNotes().trim();
+            patient = patientService.findOrCreatePatient(patientName, requestDto.getUserContact(), initialNotes);
+        } else {
+            patient = patientService.findOrCreatePatient(patientName, requestDto.getUserContact());
         }
         
         // Create the request with correct field names
@@ -97,7 +94,7 @@ public class RequestService implements RequestServiceInterface {
         request.setEmergencyDescription(requestDto.getEmergencyDescription());
         request.setRequestTime(LocalDateTime.now());
         
-        // Set medical notes if provided
+        // Set medical notes on the request if provided
         if (requestDto.getMedicalNotes() != null && !requestDto.getMedicalNotes().trim().isEmpty()) {
             request.setMedicalNotes(requestDto.getMedicalNotes().trim());
         }
@@ -175,25 +172,19 @@ public class RequestService implements RequestServiceInterface {
     private Request queueRequest(AmbulanceRequestDto requestDto, com.ambulance.ambulance_service.entity.User user) {
         logger.info("No ambulances available - adding request to queue");
 
-        // Create or find patient - use 'Unknown' as default name if not provided
+        // Create or find patient - 'Unknown' as default name if not provided
         String patientName = (requestDto.getPatientName() != null && !requestDto.getPatientName().trim().isEmpty()) 
             ? requestDto.getPatientName().trim() 
             : "Unknown";
         
-        // Create or find patient
-        Patient patient = patientService.findOrCreatePatient(
-            patientName,
-            requestDto.getUserContact()
-        );
-        
-        // Update patient's medical notes if provided
+        // Create or find patient with initial medical notes if provided
+        Patient patient;
         if (requestDto.getMedicalNotes() != null && !requestDto.getMedicalNotes().trim().isEmpty()) {
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String updatedNotes = patient.getMedicalNotes() != null 
-                ? patient.getMedicalNotes() + "\n[" + timestamp + "] " + requestDto.getMedicalNotes().trim()
-                : "[" + timestamp + "] " + requestDto.getMedicalNotes().trim();
-            patient.setMedicalNotes(updatedNotes);
-            patient = patientService.savePatient(patient);
+            String initialNotes = "[" + timestamp + "] " + requestDto.getMedicalNotes().trim();
+            patient = patientService.findOrCreatePatient(patientName, requestDto.getUserContact(), initialNotes);
+        } else {
+            patient = patientService.findOrCreatePatient(patientName, requestDto.getUserContact());
         }
         
         // Create the request
@@ -205,11 +196,13 @@ public class RequestService implements RequestServiceInterface {
         request.setRequestTime(LocalDateTime.now());
         request.setStatus(RequestStatus.PENDING);
         
-        // Set medical notes if provided
+        // Set medical notes on the request if provided
         if (requestDto.getMedicalNotes() != null && !requestDto.getMedicalNotes().trim().isEmpty()) {
-            request.setMedicalNotes(requestDto.getMedicalNotes().trim());
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String initialNotes = "[" + timestamp + "] " + requestDto.getMedicalNotes().trim();
+            request.setMedicalNotes(initialNotes);
         }
-
+        
         // Set the user if provided (for authenticated users)
         if (user != null) {
             request.setUser(user);
@@ -235,7 +228,7 @@ public class RequestService implements RequestServiceInterface {
         return request;
     }
 
-    @Scheduled(fixedDelay = 30000) // Check every 30 seconds
+    @Scheduled(fixedDelay = 30000)
     @Transactional
     public void processQueuedRequests() {
         List<Request> queuedRequests = requestRepository.findByStatusOrderByRequestTimeAsc(RequestStatus.PENDING);
@@ -250,10 +243,11 @@ public class RequestService implements RequestServiceInterface {
             try {
                 logger.debug("Processing queued request ID: {}", request.getId());
                 
-                // Find or create patient - use getUserName() instead of getPatientName()
+                // Find or create patient
                 Patient patient = patientService.findOrCreatePatient(
                     request.getUserName(),
-                    request.getUserContact()
+                    request.getUserContact(),
+                    request.getMedicalNotes() != null ? request.getMedicalNotes() : ""
                 );
                 
                 // Try to get an available ambulance with retry logic

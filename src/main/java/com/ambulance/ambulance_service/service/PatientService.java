@@ -48,11 +48,24 @@ public class PatientService implements PatientServiceInterface<Patient> {
 
     @Override
     public Patient findOrCreatePatient(String name, String contact) {
+        return findOrCreatePatient(name, contact, "");
+    }
+
+    public Patient findOrCreatePatient(String name, String contact, String medicalNotes) {
         List<Patient> patients = patientRepository.findByContact(contact);
         if (!patients.isEmpty()) {
-            return patients.get(0); // Return the first patient found with this contact
+            Patient existingPatient = patients.get(0);
+            // Update medical notes if provided
+            if (medicalNotes != null && !medicalNotes.trim().isEmpty()) {
+                // Only update if the notes are different to avoid unnecessary saves
+                if (!medicalNotes.equals(existingPatient.getMedicalNotes())) {
+                    existingPatient.setMedicalNotes(medicalNotes);
+                    return patientRepository.save(existingPatient);
+                }
+            }
+            return existingPatient;
         } else {
-            Patient newPatient = new Patient(name, contact, "");
+            Patient newPatient = new Patient(name, contact, medicalNotes != null ? medicalNotes : "");
             return patientRepository.save(newPatient);
         }
     }
