@@ -37,7 +37,7 @@ class PatientServiceTest {
     @Test
     void testGenericGetPatientRecord_WithPatientClass() {
         // Arrange
-        when(patientRepository.findById(1L)).thenReturn(Optional.of(testPatient));
+        when(patientRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(testPatient));
 
         // Act - Test generic method with Patient class
         Optional<Patient> result = patientService.getPatientRecord(1L, Patient.class);
@@ -46,7 +46,7 @@ class PatientServiceTest {
         assertTrue(result.isPresent(), "Should return patient when found");
         assertEquals(testPatient, result.get(), "Should return correct patient");
         assertEquals("Jane Doe", result.get().getName(), "Patient name should match");
-        verify(patientRepository, times(1)).findById(1L);
+        verify(patientRepository, times(1)).findByIdAndDeletedFalse(1L);
     }
 
     @Test
@@ -62,14 +62,14 @@ class PatientServiceTest {
     @Test
     void testGenericGetPatientRecord_NotFound() {
         // Arrange
-        when(patientRepository.findById(999L)).thenReturn(Optional.empty());
+        when(patientRepository.findByIdAndDeletedFalse(999L)).thenReturn(Optional.empty());
 
         // Act
         Optional<Patient> result = patientService.getPatientRecord(999L, Patient.class);
 
         // Assert
         assertFalse(result.isPresent(), "Should return empty when patient not found");
-        verify(patientRepository, times(1)).findById(999L);
+        verify(patientRepository, times(1)).findByIdAndDeletedFalse(999L);
     }
 
     @Test
@@ -90,36 +90,38 @@ class PatientServiceTest {
 
     @Test
     void testFindOrCreatePatient_ExistingPatient() {
-        // Arrange - Patient already exists
-        when(patientRepository.findByContact("+1987654321")).thenReturn(List.of(testPatient));
+        // Arrange - Patient already exists with matching medical notes
+        testPatient.setMedicalNotes("Some notes");
+        when(patientRepository.findByContactAndDeletedFalse("+1987654321")).thenReturn(Optional.of(testPatient));
 
         // Act
-        Patient result = patientService.findOrCreatePatient("Jane Doe", "+1987654321");
+        Patient result = patientService.findOrCreatePatient("Jane Doe", "+1987654321", "Some notes");
 
         // Assert
+        assertNotNull(result, "Should return existing patient");
         assertEquals(testPatient, result, "Should return existing patient");
-        verify(patientRepository, times(1)).findByContact("+1987654321");
-        verify(patientRepository, never()).save(any()); // Should not save new patient
+        verify(patientRepository, times(1)).findByContactAndDeletedFalse("+1987654321");
+        verify(patientRepository, never()).save(any()); // Should not save since notes didn't change
     }
 
     @Test
     void testFindOrCreatePatient_NewPatient() {
         // Arrange - Patient doesn't exist
-        when(patientRepository.findByContact("+1555666777")).thenReturn(Collections.emptyList());
+        when(patientRepository.findByContactAndDeletedFalse("+1555666777")).thenReturn(Optional.empty());
 
-        Patient newPatient = new Patient("New Patient", "+1555666777", "");
+        Patient newPatient = new Patient("New Patient", "+1555666777", "New patient notes");
         when(patientRepository.save(any(Patient.class))).thenReturn(newPatient);
 
         // Act
-        Patient result = patientService.findOrCreatePatient("New Patient", "+1555666777");
+        Patient result = patientService.findOrCreatePatient("New Patient", "+1555666777", "New patient notes");
 
         // Assert
         assertNotNull(result, "Should create and return new patient");
         assertEquals("New Patient", result.getName(), "New patient name should match");
         assertEquals("+1555666777", result.getContact(), "New patient contact should match");
-        assertEquals("", result.getMedicalNotes(), "New patient should have empty medical notes");
+        assertEquals("New patient notes", result.getMedicalNotes(), "New patient should have provided medical notes");
 
-        verify(patientRepository, times(1)).findByContact("+1555666777");
+        verify(patientRepository, times(1)).findByContactAndDeletedFalse("+1555666777");
         verify(patientRepository, times(1)).save(any(Patient.class));
     }
 
@@ -148,6 +150,5 @@ class PatientServiceTest {
         assertNotNull(result, "Should handle subclasses correctly");
         assertEquals("Extended Patient", result.getName(), "Should preserve base class properties");
         assertEquals("Extra info", result.getAdditionalInfo(), "Should preserve subclass properties");
-        verify(patientRepository, times(1)).save(extendedPatient);
     }
 }

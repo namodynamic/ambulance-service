@@ -14,6 +14,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -42,8 +46,19 @@ public class RequestController {
     private UserRepository userRepository;
 
     @GetMapping
-    public List<Request> getAllRequests() {
-        return requestService.getAllRequests();
+    public ResponseEntity<Page<Request>> getAllRequests(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "requestTime,desc") String[] sort) {
+        
+        Pageable pageable = PageRequest.of(
+            page, 
+            size, 
+            Sort.by(sort[0].equals("desc") ? Sort.Direction.DESC : Sort.Direction.ASC, 
+                   sort.length > 1 ? sort[1] : "requestTime")
+        );
+        
+        return ResponseEntity.ok(requestService.getAllRequests(pageable));
     }
 
     @GetMapping("/{id}")

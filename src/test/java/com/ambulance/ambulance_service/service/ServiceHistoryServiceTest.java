@@ -43,7 +43,7 @@ class ServiceHistoryServiceTest {
         testPatient = new Patient("John Doe", "+1234567890", "No allergies");
         testPatient.setId(1L);
 
-        testAmbulance = new Ambulance("Downtown Hospital", AvailabilityStatus.DISPATCHED);
+        testAmbulance = new Ambulance("Downtown Hospital", AvailabilityStatus.DISPATCHED, "AMB123");
         testAmbulance.setId(1L);
 
         testServiceHistory = new ServiceHistory(testRequest, testPatient, testAmbulance);

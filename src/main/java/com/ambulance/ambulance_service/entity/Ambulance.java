@@ -3,6 +3,9 @@ package com.ambulance.ambulance_service.entity;
 import com.fasterxml.jackson.annotation.*;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -10,10 +13,9 @@ import java.util.Objects;
 @Table(name = "ambulances")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Ambulance {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+@Getter
+@Setter
+public class Ambulance extends BaseEntity {
 
     @Version
     @Column(nullable = false)
@@ -25,125 +27,71 @@ public class Ambulance {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'AVAILABLE'")
     private AvailabilityStatus availability = AvailabilityStatus.AVAILABLE;
 
     @Column(name = "license_plate", unique = true)
     private String licensePlate;
 
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "driver_name")
+    private String driverName;
 
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @Column(name = "driver_contact")
+    private String driverContact;
 
-    @PrePersist
-    protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        if (createdAt == null) {
-            createdAt = now;
-        }
-        updatedAt = now;
-    }
+    @Column(name = "model")
+    private String model;
 
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
+    @Column(name = "`year`") 
+    private Integer year;
 
-    // Constructors
+    @Column(name = "capacity")
+    private Integer capacity;
+
+    // Default constructor for JPA
     public Ambulance() {}
 
-    public Ambulance(String currentLocation, AvailabilityStatus availability) {
+    // Convenience constructor
+    public Ambulance(String currentLocation, AvailabilityStatus availability, String licensePlate) {
         this.currentLocation = currentLocation;
         this.availability = availability != null ? availability : AvailabilityStatus.AVAILABLE;
-    }
-
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Long getVersion() {
-        return version;
-    }
-
-    public void setVersion(Long version) {
-        this.version = version != null ? version : 0L;
-    }
-
-    public String getCurrentLocation() {
-        return currentLocation;
-    }
-
-    public void setCurrentLocation(String currentLocation) {
-        this.currentLocation = currentLocation;
-    }
-
-    public AvailabilityStatus getAvailability() {
-        return availability;
-    }
-
-    public void setAvailability(AvailabilityStatus availability) {
-        this.availability = availability != null ? availability : AvailabilityStatus.AVAILABLE;
-    }
-
-    public String getLicensePlate() {
-        return licensePlate;
-    }
-
-    public void setLicensePlate(String licensePlate) {
         this.licensePlate = licensePlate;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    // Equals and HashCode
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Ambulance ambulance = (Ambulance) o;
-        return Objects.equals(id, ambulance.id) &&
-                Objects.equals(version, ambulance.version) &&
-                Objects.equals(currentLocation, ambulance.currentLocation) &&
-                availability == ambulance.availability &&
-                Objects.equals(licensePlate, ambulance.licensePlate);
+        return Objects.equals(getId(), ambulance.getId()) &&
+               Objects.equals(version, ambulance.version) &&
+               Objects.equals(currentLocation, ambulance.currentLocation) &&
+               availability == ambulance.availability &&
+               Objects.equals(licensePlate, ambulance.licensePlate);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, version, currentLocation, availability, licensePlate);
+        return Objects.hash(getId(), version, currentLocation, availability, licensePlate);
     }
 
     @Override
     public String toString() {
         return "Ambulance{" +
-                "id=" + id +
+                "id=" + getId() +
                 ", version=" + version +
                 ", currentLocation='" + currentLocation + '\'' +
                 ", availability=" + availability +
                 ", licensePlate='" + licensePlate + '\'' +
-                ", createdAt=" + createdAt +
-                ", updatedAt=" + updatedAt +
+                ", driverName='" + driverName + '\'' +
+                ", driverContact='" + driverContact + '\'' +
+                ", model='" + model + '\'' +
+                ", year=" + year +
+                ", capacity=" + capacity +
+                ", createdAt=" + getCreatedAt() +
+                ", updatedAt=" + getUpdatedAt() +
+                ", deleted=" + isDeleted() +
+                ", deletedAt=" + getDeletedAt() +
                 '}';
     }
 }

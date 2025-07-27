@@ -1,6 +1,9 @@
 package com.ambulance.ambulance_service.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.ambulance.ambulance_service.service.AmbulanceService;
@@ -51,7 +54,9 @@ public class DebugController {
         }
 
         try {
-            stats.put("requestCount", requestService.getAllRequests().size());
+            // Use a large page size to get all requests at once for the debug endpoint
+            Pageable pageable = PageRequest.of(0, 1000);
+            stats.put("requestCount", requestService.getAllRequests(pageable).getTotalElements());
             stats.put("pendingRequests", requestService.getPendingRequests().size());
         } catch (Exception e) {
             stats.put("requestError", e.getMessage());

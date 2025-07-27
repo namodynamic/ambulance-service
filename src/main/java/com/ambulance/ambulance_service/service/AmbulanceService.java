@@ -9,8 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import jakarta.annotation.PostConstruct;
 import java.util.*;
@@ -242,7 +242,103 @@ public class AmbulanceService implements AmbulanceServiceInterface {
                 .count();
     }
 
-    // Add this method to the interface if not already present
+    @Override
+    public boolean deleteAmbulance(Long id) {
+        return ambulanceRepository.findById(id)
+                .map(ambulance -> {
+                    if (ambulance.isDeleted()) {
+                        return false; // Already deleted
+                    }
+                    ambulance.setDeleted(true);
+                    ambulanceRepository.save(ambulance);
+                    
+                    // Update cache
+                    ambulanceCache.remove(id);
+                    availableQueue.removeIf(a -> a.getId().equals(id));
+                    
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    @Override
+    public Optional<Ambulance> updateAmbulance(Long id, Ambulance ambulanceDetails) {
+        return ambulanceRepository.findById(id)
+                .map(existingAmbulance -> {
+                    // Only update non-null fields from ambulanceDetails
+                    if (ambulanceDetails.getCurrentLocation() != null) {
+                        existingAmbulance.setCurrentLocation(ambulanceDetails.getCurrentLocation());
+                    }
+                    
+                    if (ambulanceDetails.getAvailability() != null) {
+                        existingAmbulance.setAvailability(ambulanceDetails.getAvailability());
+                        // Update queue if availability changed
+                        if (ambulanceDetails.getAvailability() == AvailabilityStatus.AVAILABLE) {
+                            if (!availableQueue.contains(existingAmbulance)) {
+                                availableQueue.offer(existingAmbulance);
+                            }
+                        } else {
+                            availableQueue.removeIf(a -> a.getId().equals(id));
+                        }
+                    }
+                    
+                    if (ambulanceDetails.getLicensePlate() != null) {
+                        existingAmbulance.setLicensePlate(ambulanceDetails.getLicensePlate());
+                    }
+                    
+                    if (ambulanceDetails.getDriverName() != null) {
+                        existingAmbulance.setDriverName(ambulanceDetails.getDriverName());
+                    }
+                    
+                    if (ambulanceDetails.getDriverContact() != null) {
+                        existingAmbulance.setDriverContact(ambulanceDetails.getDriverContact());
+                    }
+                    
+                    if (ambulanceDetails.getModel() != null) {
+                        existingAmbulance.setModel(ambulanceDetails.getModel());
+                    }
+                    
+                    if (ambulanceDetails.getYear() != null) {
+                        existingAmbulance.setYear(ambulanceDetails.getYear());
+                    }
+                    
+                    if (ambulanceDetails.getCapacity() != null) {
+                        existingAmbulance.setCapacity(ambulanceDetails.getCapacity());
+                    }
+                    
+                    Ambulance updatedAmbulance = ambulanceRepository.save(existingAmbulance);
+                    
+                    // Update cache
+                    ambulanceCache.put(updatedAmbulance.getId(), updatedAmbulance);
+                    
+                    return updatedAmbulance;
+                });
+    }
+
+    @Override
+    public Ambulance createAmbulance(Ambulance ambulance) {
+        // Set default values if not provided
+        if (ambulance.getAvailability() == null) {
+            ambulance.setAvailability(AvailabilityStatus.AVAILABLE);
+        }
+        
+        // Save the new ambulance
+        Ambulance savedAmbulance = ambulanceRepository.save(ambulance);
+        
+        // Update cache
+        ambulanceCache.put(savedAmbulance.getId(), savedAmbulance);
+        if (savedAmbulance.getAvailability() == AvailabilityStatus.AVAILABLE) {
+            availableQueue.offer(savedAmbulance);
+        }
+        
+        return savedAmbulance;
+    }
+
+    @Override
+    public Optional<Ambulance> findByLicensePlateIncludingDeleted(String licensePlate) {
+        return ambulanceRepository.findByLicensePlate(licensePlate);
+    }
+
     public interface AmbulanceServiceInterface {
         List<Ambulance> getAllAmbulances();
         Optional<Ambulance> getAmbulanceById(Long id);
@@ -252,5 +348,9 @@ public class AmbulanceService implements AmbulanceServiceInterface {
         Optional<Ambulance> getNextAvailableAmbulance();
         long countAllAmbulances();
         long countAmbulancesByStatus(AvailabilityStatus status);
+        boolean deleteAmbulance(Long id);
+        Optional<Ambulance> updateAmbulance(Long id, Ambulance ambulanceDetails);
+        Ambulance createAmbulance(Ambulance ambulance);
+        Optional<Ambulance> findByLicensePlateIncludingDeleted(String licensePlate);
     }
 }

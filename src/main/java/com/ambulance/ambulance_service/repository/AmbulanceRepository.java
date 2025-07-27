@@ -35,6 +35,8 @@ public interface AmbulanceRepository extends JpaRepository<Ambulance, Long> {
 
     Optional<Ambulance> findFirstByAvailability(AvailabilityStatus availabilityStatus);
 
+    Optional<Ambulance> findByLicensePlate(String licensePlate);
+
     long countByAvailability(AvailabilityStatus status);
 
     @Modifying

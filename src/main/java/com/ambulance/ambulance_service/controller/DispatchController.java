@@ -21,7 +21,7 @@ public class DispatchController {
     @PostMapping("/{requestId}")
     public ResponseEntity<?> dispatchAmbulance(@PathVariable Long requestId) {
         try {
-            requestService.updateRequestStatus(requestId, RequestStatus.DISPATCHED);
+            requestService.updateRequestStatus(requestId, RequestStatus.DISPATCHED, "Ambulance dispatched");
             Map<String, String> response = new HashMap<>();
             response.put("message", "Ambulance dispatched successfully");
             return ResponseEntity.ok(response);

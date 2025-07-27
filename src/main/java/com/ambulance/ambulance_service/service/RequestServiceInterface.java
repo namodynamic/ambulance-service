@@ -13,7 +13,7 @@ import java.util.Optional;
 public interface RequestServiceInterface {
 
     // Existing methods
-    List<Request> getAllRequests();
+    Page<Request> getAllRequests(Pageable pageable);
 
     Optional<Request> getRequestById(Long id);
 
@@ -35,13 +35,66 @@ public interface RequestServiceInterface {
 
     Page<Request> getActiveUserRequests(User user, Pageable pageable);
 
-    // New count methods for admin dashboard
+    // Count methods for admin dashboard
     long countAllRequests();
 
     long countRequestsByStatus(String status);
 
-    // Helper methods
+    // CRUD operations
+    
+    /**
+     * Creates a new request with the provided details
+     * @param request the request to create
+     * @return the created request
+     */
     Request createRequest(Request request);
 
+    /**
+     * Updates an existing request
+     * @param request the request with updated information
+     * @return the updated request
+     */
     Request updateRequest(Request request);
+    
+    /**
+     * Soft deletes a request by ID
+     * @param id the ID of the request to delete
+     * @return true if the request was found and deleted, false otherwise
+     */
+    boolean deleteRequest(Long id);
+    
+    /**
+     * Gets a request by ID, including soft-deleted ones
+     * @param id the ID of the request to find
+     * @return the request if found, empty otherwise
+     */
+    Optional<Request> findByIdIncludingDeleted(Long id);
+    
+    /**
+     * Gets all requests, including soft-deleted ones
+     * @return list of all requests
+     */
+    List<Request> findAllIncludingDeleted();
+    
+    /**
+     * Gets all requests with pagination, including soft-deleted ones
+     * @param pageable pagination information
+     * @return page of requests
+     */
+    Page<Request> findAllIncludingDeleted(Pageable pageable);
+    
+    /**
+     * Restores a soft-deleted request
+     * @param id the ID of the request to restore
+     * @return true if the request was found and restored, false otherwise
+     */
+    boolean restoreRequest(Long id);
+    
+    /**
+     * Permanently deletes a request from the database
+     * WARNING: This action cannot be undone
+     * @param id the ID of the request to delete
+     * @return true if the request was found and deleted, false otherwise
+     */
+    boolean permanentlyDeleteRequest(Long id);
 }

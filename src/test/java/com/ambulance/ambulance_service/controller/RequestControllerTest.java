@@ -11,10 +11,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -160,25 +162,35 @@ class RequestControllerTest {
         Request request1 = new Request("Patient 1", "+1111111111", "Location 1", "Emergency 1");
         request1.setId(1L);
         request1.setStatus(RequestStatus.PENDING);
+        request1.setRequestTime(LocalDateTime.now());
 
         Request request2 = new Request("Patient 2", "+2222222222", "Location 2", "Emergency 2");
         request2.setId(2L);
         request2.setStatus(RequestStatus.DISPATCHED);
+        request2.setRequestTime(LocalDateTime.now().minusHours(1));
 
-        when(requestService.getAllRequests()).thenReturn(Arrays.asList(request1, request2));
+        // Create a page of requests with proper sorting
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("requestTime").descending());
+        Page<Request> page = new PageImpl<>(Arrays.asList(request1, request2), pageable, 2);
+        
+        // Mock the service call with any Pageable
+        when(requestService.getAllRequests(any(Pageable.class))).thenReturn(page);
 
         // Act & Assert
-        mockMvc.perform(get("/api/requests"))
+        mockMvc.perform(get("/api/requests")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .param("sort", "requestTime,desc"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].userName", is("Patient 1")))
-                .andExpect(jsonPath("$[0].status", is("PENDING")))
-                .andExpect(jsonPath("$[1].id", is(2)))
-                .andExpect(jsonPath("$[1].userName", is("Patient 2")))
-                .andExpect(jsonPath("$[1].status", is("DISPATCHED")));
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].userName", is("Patient 1")))
+                .andExpect(jsonPath("$.content[0].status", is("PENDING")))
+                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].userName", is("Patient 2")))
+                .andExpect(jsonPath("$.content[1].status", is("DISPATCHED")));
 
-        verify(requestService, times(1)).getAllRequests();
+        verify(requestService, times(1)).getAllRequests(any(Pageable.class));
     }
 
     @Test
