@@ -395,214 +395,6 @@ class DataManager {
 
   // Service History
   async getServiceHistory() {
-    return this.getDataWithFallback(
-      '/service-history',
-      () => {
-        // Fallback: generate history from completed requests
-        const requests = this.getLocalRequests();
-        return requests
-          .filter(r => r.status === 'COMPLETED')
-          .map(r => ({
-            id: r.id,
-            requestId: r.id,
-            patientId: r.patientId || null,
-            ambulanceId: r.ambulanceId,
-            status: r.status,
-            createdAt: r.requestTime,
-            arrivalTime: r.arrivalTime || null,
-            completionTime: r.completionTime || r.dispatchTime
-          }));
-      },
-      'service_history'
-    );
-  }
-
-  // Local storage implementations (fallback)
-  getLocalRequests() {
-    const stored = localStorage.getItem(this.localStoragePrefix + 'requests');
-    return stored ? JSON.parse(stored) : [];
-  }
-
-  saveLocalRequests(requests) {
-    localStorage.setItem(this.localStoragePrefix + 'requests', JSON.stringify(requests));
-  }
-
-  saveLocalRequest(requestData) {
-    const requests = this.getLocalRequests();
-    const newRequest = {
-      id: this.generateId(),
-      ...requestData,
-      requestTime: new Date().toISOString(),
-      status: 'PENDING'
-    };
-    requests.push(newRequest);
-    this.saveLocalRequests(requests);
-    return newRequest;
-  }
-
-  updateLocalRequestStatus(requestId, status, notes = '') {
-    const requests = this.getLocalRequests();
-    const request = requests.find(r => r.id == requestId);
-
-    if (request) {
-      request.status = status;
-
-      // Add timestamp for status changes
-      if (status === 'DISPATCHED' && !request.dispatchTime) {
-        request.dispatchTime = new Date().toISOString();
-      } else if (status === 'ARRIVED' && !request.arrivalTime) {
-        request.arrivalTime = new Date().toISOString();
-      } else if (status === 'COMPLETED' && !request.completionTime) {
-        request.completionTime = new Date().toISOString();
-
-        // Free up the ambulance if completed
-        if (request.ambulanceId) {
-          this.updateLocalAmbulanceStatus(request.ambulanceId, 'AVAILABLE');
-        }
-      }
-
-      // Add notes if provided
-      if (notes) {
-        if (!request.statusHistory) {
-          request.statusHistory = [];
-        }
-        request.statusHistory.push({
-          status: status,
-          notes: notes,
-          timestamp: new Date().toISOString(),
-          changedBy: 'System'
-        });
-      }
-
-      this.saveLocalRequests(requests);
-      return request;
-    }
-
-    throw new Error('Request not found');
-  }
-
-  getLocalAmbulances() {
-    const stored = localStorage.getItem(this.localStoragePrefix + 'ambulances');
-    if (stored) {
-      return JSON.parse(stored);
-    }
-
-    // Initialize with sample data if none exists
-    const sampleAmbulances = [
-      { id: 1, currentLocation: 'Central Station', availability: 'AVAILABLE' },
-      { id: 2, currentLocation: 'North Station', availability: 'AVAILABLE' },
-      { id: 3, currentLocation: 'South Station', availability: 'MAINTENANCE' },
-      { id: 4, currentLocation: 'East Station', availability: 'AVAILABLE' },
-      { id: 5, currentLocation: 'West Station', availability: 'DISPATCHED' }
-    ];
-    this.saveLocalAmbulances(sampleAmbulances);
-    return sampleAmbulances;
-  }
-
-  saveLocalAmbulances(ambulances) {
-    localStorage.setItem(this.localStoragePrefix + 'ambulances', JSON.stringify(ambulances));
-  }
-
-  saveLocalAmbulance(ambulanceData) {
-    const ambulances = this.getLocalAmbulances();
-    const newAmbulance = {
-      id: this.generateId(),
-      ...ambulanceData
-    };
-    ambulances.push(newAmbulance);
-    this.saveLocalAmbulances(ambulances);
-    return newAmbulance;
-  }
-
-  updateLocalAmbulanceStatus(ambulanceId, status) {
-    const ambulances = this.getLocalAmbulances();
-    const ambulance = ambulances.find(a => a.id == ambulanceId);
-
-    if (ambulance) {
-      ambulance.availability = status;
-      ambulance.status = status.toLowerCase();
-      this.saveLocalAmbulances(ambulances);
-      return ambulance;
-    }
-
-    throw new Error('Ambulance not found');
-  }
-
-  updateLocalAmbulanceLocation(ambulanceId, location) {
-    const ambulances = this.getLocalAmbulances();
-    const ambulance = ambulances.find(a => a.id == ambulanceId);
-
-    if (ambulance) {
-      ambulance.currentLocation = location;
-      ambulance.location = location;
-      this.saveLocalAmbulances(ambulances);
-      return ambulance;
-    }
-
-    throw new Error('Ambulance not found');
-  }
-
-  getLocalPatients() {
-    const stored = localStorage.getItem(this.localStoragePrefix + 'patients');
-    return stored ? JSON.parse(stored) : [];
-  }
-
-  saveLocalPatients(patients) {
-    localStorage.setItem(this.localStoragePrefix + 'patients', JSON.stringify(patients));
-  }
-
-  findOrCreateLocalPatient(name, contact) {
-    const patients = this.getLocalPatients();
-    let patient = patients.find(p => p.contact === contact);
-
-    if (!patient) {
-      patient = {
-        id: this.generateId(),
-        name: name,
-        contact: contact,
-        medicalNotes: '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      patients.push(patient);
-      this.saveLocalPatients(patients);
-    }
-
-    return patient;
-  }
-
-  dispatchLocalAmbulance(requestId) {
-    const requests = this.getLocalRequests();
-    const ambulances = this.getLocalAmbulances();
-
-    const request = requests.find(r => r.id == requestId);
-    if (!request) {
-      throw new Error('Request not found');
-    }
-
-    const availableAmbulance = ambulances.find(a => a.availability === 'AVAILABLE');
-    if (!availableAmbulance) {
-      throw new Error('No ambulance available');
-    }
-
-    // Update request
-    request.status = 'DISPATCHED';
-    request.ambulanceId = availableAmbulance.id;
-    request.dispatchTime = new Date().toISOString();
-
-    // Update ambulance
-    availableAmbulance.availability = 'DISPATCHED';
-    availableAmbulance.status = 'dispatched';
-
-    // Save changes
-    this.saveLocalRequests(requests);
-    this.saveLocalAmbulances(ambulances);
-
-    return { request, ambulance: availableAmbulance };
-  }
-
-  // Statistics and analytics
-  async getStatistics() {
     try {
       const [requests, ambulances, patients] = await Promise.all([
         this.getRequests(),
@@ -920,6 +712,185 @@ class DataManager {
     } catch (error) {
       return 'Invalid Time';
     }
+  }
+
+  // Local storage implementations (fallback)
+  getLocalRequests() {
+    const stored = localStorage.getItem(this.localStoragePrefix + 'requests');
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  saveLocalRequests(requests) {
+    localStorage.setItem(this.localStoragePrefix + 'requests', JSON.stringify(requests));
+  }
+
+  saveLocalRequest(requestData) {
+    const requests = this.getLocalRequests();
+    const newRequest = {
+      id: this.generateId(),
+      ...requestData,
+      requestTime: new Date().toISOString(),
+      status: 'PENDING'
+    };
+    requests.push(newRequest);
+    this.saveLocalRequests(requests);
+    return newRequest;
+  }
+
+  updateLocalRequestStatus(requestId, status, notes = '') {
+    const requests = this.getLocalRequests();
+    const request = requests.find(r => r.id == requestId);
+
+    if (request) {
+      request.status = status;
+
+      // Add timestamp for status changes
+      if (status === 'DISPATCHED' && !request.dispatchTime) {
+        request.dispatchTime = new Date().toISOString();
+      } else if (status === 'ARRIVED' && !request.arrivalTime) {
+        request.arrivalTime = new Date().toISOString();
+      } else if (status === 'COMPLETED' && !request.completionTime) {
+        request.completionTime = new Date().toISOString();
+
+        // Free up the ambulance if completed
+        if (request.ambulanceId) {
+          this.updateLocalAmbulanceStatus(request.ambulanceId, 'AVAILABLE');
+        }
+      }
+
+      // Add notes if provided
+      if (notes) {
+        if (!request.statusHistory) {
+          request.statusHistory = [];
+        }
+        request.statusHistory.push({
+          status: status,
+          notes: notes,
+          timestamp: new Date().toISOString(),
+          changedBy: 'System'
+        });
+      }
+
+      this.saveLocalRequests(requests);
+      return request;
+    }
+
+    throw new Error('Request not found');
+  }
+
+  getLocalAmbulances() {
+    const stored = localStorage.getItem(this.localStoragePrefix + 'ambulances');
+    if (!stored) {
+      return [];
+    }
+    try {
+      return JSON.parse(stored);
+    } catch (e) {
+      console.error('Error parsing ambulances from localStorage', e);
+      return [];
+    }
+  }
+
+  saveLocalAmbulances(ambulances) {
+    localStorage.setItem(this.localStoragePrefix + 'ambulances', JSON.stringify(ambulances));
+  }
+
+  saveLocalAmbulance(ambulanceData) {
+    const ambulances = this.getLocalAmbulances();
+    const newAmbulance = {
+      id: this.generateId(),
+      ...ambulanceData
+    };
+    ambulances.push(newAmbulance);
+    this.saveLocalAmbulances(ambulances);
+    return newAmbulance;
+  }
+
+  updateLocalAmbulanceStatus(ambulanceId, status) {
+    const ambulances = this.getLocalAmbulances();
+    const ambulance = ambulances.find(a => a.id == ambulanceId);
+
+    if (ambulance) {
+      ambulance.availability = status;
+      ambulance.status = status.toLowerCase();
+      this.saveLocalAmbulances(ambulances);
+      return ambulance;
+    }
+
+    throw new Error('Ambulance not found');
+  }
+
+  updateLocalAmbulanceLocation(ambulanceId, location) {
+    const ambulances = this.getLocalAmbulances();
+    const ambulance = ambulances.find(a => a.id == ambulanceId);
+
+    if (ambulance) {
+      ambulance.currentLocation = location;
+      ambulance.location = location;
+      this.saveLocalAmbulances(ambulances);
+      return ambulance;
+    }
+
+    throw new Error('Ambulance not found');
+  }
+
+  getLocalPatients() {
+    const stored = localStorage.getItem(this.localStoragePrefix + 'patients');
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  saveLocalPatients(patients) {
+    localStorage.setItem(this.localStoragePrefix + 'patients', JSON.stringify(patients));
+  }
+
+  findOrCreateLocalPatient(name, contact) {
+    const patients = this.getLocalPatients();
+    let patient = patients.find(p => p.contact === contact);
+
+    if (!patient) {
+      patient = {
+        id: this.generateId(),
+        name: name,
+        contact: contact,
+        medicalNotes: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      patients.push(patient);
+      this.saveLocalPatients(patients);
+    }
+
+    return patient;
+  }
+
+  dispatchLocalAmbulance(requestId) {
+    const requests = this.getLocalRequests();
+    const ambulances = this.getLocalAmbulances();
+
+    const request = requests.find(r => r.id == requestId);
+    if (!request) {
+      throw new Error('Request not found');
+    }
+
+    const availableAmbulance = ambulances.find(a => a.availability === 'AVAILABLE');
+    if (!availableAmbulance) {
+      throw new Error('No ambulance available');
+    }
+
+    // Update request
+    request.status = 'DISPATCHED';
+    request.ambulanceId = availableAmbulance.id;
+    request.dispatchTime = new Date().toISOString();
+
+    // Update ambulance
+    availableAmbulance.availability = 'DISPATCHED';
+    availableAmbulance.status = 'dispatched';
+
+    // Save changes
+    this.saveLocalRequests(requests);
+    this.saveLocalAmbulances(ambulances);
+
+    return { request, ambulance: availableAmbulance };
   }
 }
 

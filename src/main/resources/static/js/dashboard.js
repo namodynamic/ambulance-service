@@ -209,19 +209,7 @@ class UnifiedDashboard {
     const stored =
       localStorage.getItem("ambulance_ambulances") ||
       localStorage.getItem("ambulances");
-    if (stored) return JSON.parse(stored);
-    const sampleAmbulances = [
-      { id: 1, currentLocation: "Central Station", availability: "AVAILABLE" },
-      { id: 2, currentLocation: "North Station", availability: "AVAILABLE" },
-      { id: 3, currentLocation: "South Station", availability: "MAINTENANCE" },
-      { id: 4, currentLocation: "East Station", availability: "AVAILABLE" },
-      { id: 5, currentLocation: "West Station", availability: "DISPATCHED" },
-    ];
-    localStorage.setItem(
-      "ambulance_ambulances",
-      JSON.stringify(sampleAmbulances)
-    );
-    return sampleAmbulances;
+    return stored ? JSON.parse(stored) : [];
   }
 
   saveLocalStorageAmbulances(ambulances) {
