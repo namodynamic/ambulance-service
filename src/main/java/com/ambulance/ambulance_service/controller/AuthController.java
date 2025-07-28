@@ -68,13 +68,17 @@ public class AuthController {
                 role = Role.USER;
             }
 
-            // Create new user
+            // Create new user with all fields
             User user = new User();
             user.setUsername(request.getUsername());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
             user.setRole(role);
             user.setEmail(request.getEmail());
+            user.setFirstName(request.getFirstName());
+            user.setLastName(request.getLastName());
+            user.setPhoneNumber(request.getPhoneNumber());
             user.setEnabled(true);
+            
             user = userRepository.save(user);
 
             // Generate token

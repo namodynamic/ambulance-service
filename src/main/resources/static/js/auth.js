@@ -360,6 +360,9 @@ class AuthManager {
       username: formData.get("username"),
       email: formData.get("email"),
       password: password,
+      firstName: formData.get("firstName"),
+      lastName: formData.get("lastName"),
+      phoneNumber: formData.get("phoneNumber"),
       role: "ROLE_USER",
     };
 
