@@ -39,6 +39,8 @@ public interface AmbulanceRepository extends JpaRepository<Ambulance, Long> {
 
     long countByAvailability(AvailabilityStatus status);
 
+    List<Ambulance> findByDeletedFalse();
+
     @Modifying
     @Query("UPDATE Ambulance a SET a.availability = :newStatus, a.version = a.version + 1 " +
             "WHERE a.id = :id AND a.version = :version")

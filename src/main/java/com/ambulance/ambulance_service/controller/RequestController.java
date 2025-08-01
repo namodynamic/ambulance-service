@@ -50,13 +50,10 @@ public class RequestController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "requestTime,desc") String[] sort) {
-        
-        Pageable pageable = PageRequest.of(
-            page, 
-            size, 
-            Sort.by(sort[0].equals("desc") ? Sort.Direction.DESC : Sort.Direction.ASC, 
-                   sort.length > 1 ? sort[1] : "requestTime")
-        );
+
+        String sortProperty = (sort.length > 0) ? sort[0] : "requestTime";
+        Sort.Direction direction = (sort.length > 1 && sort[1].equalsIgnoreCase("desc")) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortProperty));
         
         return ResponseEntity.ok(requestService.getAllRequests(pageable));
     }

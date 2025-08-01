@@ -4,9 +4,12 @@ import com.ambulance.ambulance_service.entity.*;
 import com.ambulance.ambulance_service.dto.ServiceHistoryDTO;
 import com.ambulance.ambulance_service.entity.ServiceHistory;
 import com.ambulance.ambulance_service.exception.EntityNotFoundException;
+import com.ambulance.ambulance_service.repository.RequestRepository;
 import com.ambulance.ambulance_service.repository.ServiceHistoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -16,8 +19,25 @@ import java.util.stream.Collectors;
 @Service
 public class ServiceHistoryService {
 
+
+    private final RequestService requestService;
+    private final ServiceHistoryRepository serviceHistoryRepository;
+    private final RequestRepository requestRepository;
+    private final AmbulanceService ambulanceService;
+
     @Autowired
-    private ServiceHistoryRepository serviceHistoryRepository;
+    public ServiceHistoryService(
+            ServiceHistoryRepository serviceHistoryRepository,
+            @Lazy RequestService requestService,
+            RequestRepository requestRepository,
+            AmbulanceService ambulanceService
+    ) {
+        this.serviceHistoryRepository = serviceHistoryRepository;
+        this.requestService = requestService;
+        this.requestRepository = requestRepository;
+        this.ambulanceService = ambulanceService;
+    }
+
 
     public List<ServiceHistoryDTO> getAllServiceHistory() {
         return serviceHistoryRepository.findAll().stream()
@@ -25,7 +45,7 @@ public class ServiceHistoryService {
                 .collect(Collectors.toList());
     }
 
-    // Add this helper method to convert entity to DTO
+    // helper method to convert entity to DTO
     public ServiceHistoryDTO convertToDTO(ServiceHistory history) {
         if (history == null) {
             return null;
@@ -87,7 +107,7 @@ public class ServiceHistoryService {
     }
 
     public void updateServiceStatus(Long requestId, ServiceStatus newStatus, String notes) {
-        // First try to find by request ID
+
         List<ServiceHistory> histories = serviceHistoryRepository.findByRequestId(requestId);
         ServiceHistory history;
 
@@ -111,12 +131,12 @@ public class ServiceHistoryService {
             throw new IllegalArgumentException("New status cannot be null");
         }
 
-        // No need to validate if status isn't changing
+
         if (currentStatus == newStatus) {
             return;
         }
 
-        // Define valid transitions
+        //  transitions
         switch (currentStatus) {
             case PENDING:
                 if (!List.of(ServiceStatus.IN_PROGRESS, ServiceStatus.CANCELLED).contains(newStatus)) {
@@ -160,7 +180,6 @@ public class ServiceHistoryService {
         // Update timestamps based on status
         switch (newStatus) {
             case IN_PROGRESS:
-                // No special timestamp for IN_PROGRESS as it's set on creation
                 break;
             case ARRIVED:
                 history.setArrivalTime(now);
@@ -177,5 +196,60 @@ public class ServiceHistoryService {
 
     public List<ServiceHistory> getServiceHistoryByRequestId(Long id) {
         return serviceHistoryRepository.findByRequestId(id);
+    }
+
+    @Transactional
+    public void updateStatusAndSync(Long serviceHistoryId, String statusStr, String notes) {
+        ServiceHistory history = serviceHistoryRepository.findById(serviceHistoryId)
+                .orElseThrow(() -> new EntityNotFoundException("ServiceHistory not found"));
+
+        ServiceStatus newStatus = ServiceStatus.valueOf(statusStr);
+
+
+        history.setStatus(newStatus);
+        if (notes != null) history.setNotes(notes);
+        serviceHistoryRepository.save(history);
+
+
+        Request request = history.getRequest();
+        if (request != null) {
+
+            RequestStatus reqStatus = mapServiceStatusToRequestStatus(newStatus);
+            if (reqStatus != null && reqStatus != request.getStatus()) {
+                request.setStatus(reqStatus);
+
+                requestService.saveStatusHistory(request, request.getStatus(), reqStatus, notes);
+                requestRepository.save(request);
+            }
+        }
+
+
+        if (history.getAmbulance() != null) {
+            AvailabilityStatus ambStatus = mapServiceStatusToAmbulanceAvailability(newStatus);
+            if (ambStatus != null) {
+                ambulanceService.updateAmbulanceStatus(history.getAmbulance().getId(), ambStatus);
+            }
+        }
+    }
+
+    // Helper mapping methods for status sync
+    private RequestStatus mapServiceStatusToRequestStatus(ServiceStatus status) {
+        if (status == null) return null;
+        return switch (status) {
+            case PENDING -> RequestStatus.PENDING;
+            case IN_PROGRESS -> RequestStatus.IN_PROGRESS;
+            case ARRIVED -> RequestStatus.ARRIVED;
+            case COMPLETED -> RequestStatus.COMPLETED;
+            case CANCELLED -> RequestStatus.CANCELLED;
+            default -> null;
+        };
+    }
+    private AvailabilityStatus mapServiceStatusToAmbulanceAvailability(ServiceStatus status) {
+        if (status == null) return null;
+        return switch (status) {
+            case PENDING, COMPLETED, CANCELLED -> AvailabilityStatus.AVAILABLE;
+            case IN_PROGRESS, ARRIVED -> AvailabilityStatus.DISPATCHED;
+            default -> null;
+        };
     }
 }

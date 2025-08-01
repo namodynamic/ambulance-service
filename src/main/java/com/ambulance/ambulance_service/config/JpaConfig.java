@@ -15,8 +15,7 @@ public class JpaConfig {
 
     @Bean
     public AuditorAware<String> auditorProvider() {
-        // In a real application, you would get the current user from the security context
-        // For now, we'll return a default value
+
         return () -> Optional.of("system");
     }
 }

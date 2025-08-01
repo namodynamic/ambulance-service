@@ -2,125 +2,249 @@ package com.ambulance.ambulance_service.service;
 
 import com.ambulance.ambulance_service.entity.Ambulance;
 import com.ambulance.ambulance_service.entity.AvailabilityStatus;
+import com.ambulance.ambulance_service.exception.AmbulanceNotFoundException;
 import com.ambulance.ambulance_service.repository.AmbulanceRepository;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
 
-import jakarta.annotation.PostConstruct;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class AmbulanceService implements AmbulanceServiceInterface {
     private static final Logger logger = LoggerFactory.getLogger(AmbulanceService.class);
+    private static final long CACHE_REFRESH_INTERVAL = 300000; // 5 minutes in milliseconds
 
-    @Autowired
-    private AmbulanceRepository ambulanceRepository;
-
+    private final AmbulanceRepository ambulanceRepository;
     private final Map<Long, Ambulance> ambulanceCache = new ConcurrentHashMap<>();
     private final Queue<Ambulance> availableQueue = new ConcurrentLinkedQueue<>();
+
+    @Autowired
+    public AmbulanceService(AmbulanceRepository ambulanceRepository) {
+        this.ambulanceRepository = ambulanceRepository;
+    }
 
     @PostConstruct
     public void init() {
         try {
             loadAmbulances();
+            logger.info("AmbulanceService initialized with {} ambulances ({} available)", 
+                ambulanceCache.size(), availableQueue.size());
         } catch (Exception e) {
-            logger.error("Failed to initialize ambulance service: {}", e.getMessage(), e);
-            throw new IllegalStateException("Failed to initialize ambulance service", e);
+            logger.error("Failed to initialize AmbulanceService: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to initialize AmbulanceService", e);
+        }
+    }
+
+    @Scheduled(fixedRate = CACHE_REFRESH_INTERVAL)
+    public void refreshCache() {
+        try {
+            logger.debug("Refreshing ambulance cache...");
+            loadAmbulances();
+            logger.info("Ambulance cache refreshed: {} ambulances ({} available)", 
+                ambulanceCache.size(), availableQueue.size());
+        } catch (Exception e) {
+            logger.error("Error refreshing ambulance cache: {}", e.getMessage(), e);
         }
     }
 
     private synchronized void loadAmbulances() {
         try {
-            logger.info("Loading ambulances from database...");
+            logger.debug("Loading ambulances from database...");
+            List<Ambulance> allAmbulances = ambulanceRepository.findByDeletedFalse();
             
             // Clear existing state
             availableQueue.clear();
             ambulanceCache.clear();
 
-            // Load all ambulances from the database
-            List<Ambulance> allAmbulances = ambulanceRepository.findAll();
-            logger.info("Found {} total ambulances in database", allAmbulances.size());
+            if (allAmbulances.isEmpty()) {
+                logger.warn("No ambulances found in the database");
+                return;
+            }
 
             // Process each ambulance
             for (Ambulance ambulance : allAmbulances) {
-                // Create a defensive copy to avoid modifying the original object
-                Ambulance cachedAmbulance = new Ambulance();
-                // Copy all properties from the original ambulance
-                cachedAmbulance.setId(ambulance.getId());
-                cachedAmbulance.setCurrentLocation(ambulance.getCurrentLocation());
-                cachedAmbulance.setAvailability(ambulance.getAvailability());
-                cachedAmbulance.setLicensePlate(ambulance.getLicensePlate());
-                // Copy any other fields as needed
-                
-                ambulanceCache.put(cachedAmbulance.getId(), cachedAmbulance);
-                
-                // Only add available ambulances to the queue
-                if (cachedAmbulance.getAvailability() == AvailabilityStatus.AVAILABLE) {
-                    availableQueue.offer(cachedAmbulance);
-                    logger.debug("Added available ambulance {} to queue", cachedAmbulance.getId());
+                if (ambulance == null) {
+                    logger.warn("Skipping null ambulance in database");
+                    continue;
+                }
+
+                try {
+                    Ambulance cachedAmbulance = new Ambulance();
+                    cachedAmbulance.setId(ambulance.getId());
+                    cachedAmbulance.setCurrentLocation(ambulance.getCurrentLocation());
+                    cachedAmbulance.setAvailability(ambulance.getAvailability() != null ? 
+                        ambulance.getAvailability() : AvailabilityStatus.AVAILABLE);
+                    cachedAmbulance.setLicensePlate(ambulance.getLicensePlate());
+                    cachedAmbulance.setDriverName(ambulance.getDriverName());
+                    cachedAmbulance.setDriverContact(ambulance.getDriverContact());
+                    cachedAmbulance.setModel(ambulance.getModel());
+                    cachedAmbulance.setYear(ambulance.getYear());
+                    cachedAmbulance.setCapacity(ambulance.getCapacity());
+
+                    ambulanceCache.put(cachedAmbulance.getId(), cachedAmbulance);
+
+                    if (cachedAmbulance.getAvailability() == AvailabilityStatus.AVAILABLE) {
+                        availableQueue.offer(cachedAmbulance);
+                        logger.debug("Added available ambulance {} to queue", cachedAmbulance.getId());
+                    }
+                } catch (Exception e) {
+                    logger.error("Error processing ambulance with ID {}: {}", 
+                        ambulance.getId(), e.getMessage(), e);
                 }
             }
 
-            logger.info("Loaded {} total ambulances, {} available",
-                    allAmbulances.size(), availableQueue.size());
+            logger.info("Loaded {} ambulances ({} available) into cache", 
+                ambulanceCache.size(), availableQueue.size());
                     
+        } catch (DataAccessException e) {
+            logger.error("Database error while loading ambulances: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to load ambulances from database", e);
         } catch (Exception e) {
-            logger.error("Error loading ambulances: {}", e.getMessage(), e);
+            logger.error("Unexpected error while loading ambulances: {}", e.getMessage(), e);
             throw new IllegalStateException("Failed to load ambulances", e);
         }
     }
 
     @Override
     public List<Ambulance> getAllAmbulances() {
+        if (ambulanceCache.isEmpty()) {
+            logger.warn("Ambulance cache is empty, attempting to reload...");
+            loadAmbulances();
+            
+            if (ambulanceCache.isEmpty()) {
+                logger.error("No ambulances available in the system");
+                return Collections.emptyList();
+            }
+        }
         return new ArrayList<>(ambulanceCache.values());
     }
 
     @Override
     public Optional<Ambulance> getAmbulanceById(Long id) {
-        return Optional.ofNullable(ambulanceCache.get(id));
+        if (id == null) {
+            logger.warn("Attempted to get ambulance with null ID");
+            return Optional.empty();
+        }
+        
+        Ambulance ambulance = ambulanceCache.get(id);
+        if (ambulance == null) {
+            logger.debug("Ambulance with ID {} not found in cache, checking database...", id);
+            try {
+                ambulance = ambulanceRepository.findById(id).orElse(null);
+                if (ambulance != null) {
+                    ambulanceCache.put(ambulance.getId(), ambulance);
+                    logger.debug("Added ambulance with ID {} to cache", id);
+                }
+            } catch (Exception e) {
+                logger.error("Error fetching ambulance with ID {} from database: {}", id, e.getMessage(), e);
+            }
+        }
+        return Optional.ofNullable(ambulance);
     }
 
     @Override
     public Ambulance saveAmbulance(Ambulance ambulance) {
-        Ambulance saved = ambulanceRepository.save(ambulance);
-        updateCacheAndQueue(saved);
-        logger.info("Saved ambulance ID: {}, Status: {}", saved.getId(), saved.getAvailability());
-        return saved;
+        if (ambulance == null) {
+            throw new IllegalArgumentException("Ambulance cannot be null");
+        }
+
+        try {
+            Ambulance savedAmbulance = ambulanceRepository.save(ambulance);
+            updateCacheAndQueue(savedAmbulance);
+            logger.info("Saved ambulance with ID: {}", savedAmbulance.getId());
+            return savedAmbulance;
+        } catch (DataAccessException e) {
+            logger.error("Database error while saving ambulance: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to save ambulance to database", e);
+        } catch (Exception e) {
+            logger.error("Unexpected error while saving ambulance: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to save ambulance", e);
+        }
     }
 
     @Override
-    public void updateAmbulanceStatus(Long ambulanceId, AvailabilityStatus newStatus) {
-        ambulanceRepository.findById(ambulanceId).ifPresent(ambulance -> {
-            AvailabilityStatus oldStatus = ambulance.getAvailability();
-            if (oldStatus != newStatus) {
-                ambulance.setAvailability(newStatus);
-                Ambulance updated = ambulanceRepository.save(ambulance);
-                updateCacheAndQueue(updated);
-                logger.info("Updated ambulance {} status from {} to {}",
-                        updated.getId(), oldStatus, newStatus);
-            }
-        });
+    public void updateAmbulanceStatus(Long id, AvailabilityStatus status) {
+        if (id == null) {
+            throw new IllegalArgumentException("Ambulance ID cannot be null");
+        }
+        if (status == null) {
+            throw new IllegalArgumentException("Status cannot be null");
+        }
+
+        try {
+            Ambulance ambulance = ambulanceRepository.findById(id)
+                .orElseThrow(() -> new AmbulanceNotFoundException("Ambulance not found with id: " + id));
+            
+            ambulance.setAvailability(status);
+            Ambulance updatedAmbulance = ambulanceRepository.save(ambulance);
+            updateCacheAndQueue(updatedAmbulance);
+            
+            logger.info("Updated ambulance {} status to {}", id, status);
+        } catch (AmbulanceNotFoundException e) {
+            logger.warn("Attempted to update non-existent ambulance with ID: {}", id);
+            throw e;
+        } catch (ObjectOptimisticLockingFailureException e) {
+            logger.error("Optimistic locking failure while updating ambulance {}: {}", id, e.getMessage());
+            throw new IllegalStateException("Ambulance was modified by another transaction. Please try again.", e);
+        } catch (DataAccessException e) {
+            logger.error("Database error while updating ambulance status: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to update ambulance status in database", e);
+        } catch (Exception e) {
+            logger.error("Unexpected error while updating ambulance status: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to update ambulance status", e);
+        }
     }
 
-    private synchronized void updateCacheAndQueue(Ambulance ambulance) {
-        if (ambulance == null) return;
+    @Override
+    public List<Ambulance> getAvailableAmbulances() {
+        if (availableQueue.isEmpty()) {
+            logger.debug("Available queue is empty, checking for available ambulances...");
+            List<Ambulance> available = ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE);
+            available.forEach(ambulance -> {
+                if (!availableQueue.contains(ambulance)) {
+                    availableQueue.offer(ambulance);
+                }
+            });
+            
+            if (availableQueue.isEmpty()) {
+                logger.warn("No available ambulances found in the system");
+            }
+        }
+        return new ArrayList<>(availableQueue);
+    }
+
+    @Override
+    public Optional<Ambulance> getNextAvailableAmbulance() {
+        Ambulance ambulance = availableQueue.poll();
+        if (ambulance != null) {
+            // Update the status in the database and cache
+            updateAmbulanceStatus(ambulance.getId(), AvailabilityStatus.DISPATCHED);
+        }
+        return Optional.ofNullable(ambulance);
+    }
+
+    private void updateCacheAndQueue(Ambulance ambulance) {
+        if (ambulance == null || ambulance.getId() == null) {
+            return;
+        }
 
         // Update cache
         ambulanceCache.put(ambulance.getId(), ambulance);
-
-        // Update queue based on new status
+        
+        // Update available queue
         if (ambulance.getAvailability() == AvailabilityStatus.AVAILABLE) {
-            // Remove if exists to avoid duplicates, then add to end
+            // Remove if already in queue to avoid duplicates
             availableQueue.removeIf(a -> a.getId().equals(ambulance.getId()));
             availableQueue.offer(ambulance);
             logger.debug("Added/Updated ambulance {} in available queue", ambulance.getId());
@@ -134,223 +258,152 @@ public class AmbulanceService implements AmbulanceServiceInterface {
     }
 
     @Override
-    public List<Ambulance> getAvailableAmbulances() {
-        // Get fresh data from database
-        List<Ambulance> available = ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE);
-        
-        // Update cache and queue
-        synchronized (this) {
-            // Update cache
-            available.forEach(ambulance -> {
-                Ambulance cached = ambulanceCache.computeIfAbsent(ambulance.getId(), id -> ambulance);
-                // Update the cached object with latest data
-                cached.setCurrentLocation(ambulance.getCurrentLocation());
-                cached.setAvailability(ambulance.getAvailability());
-                // Other fields as needed
-            });
-            
-            // Rebuild queue with current available ambulances in cache
-            availableQueue.clear();
-            availableQueue.addAll(available.stream()
-                .map(a -> ambulanceCache.get(a.getId()))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList()));
-        }
-        
-        return new ArrayList<>(available);
-    }
-
-    @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.SERIALIZABLE)
-    public Optional<Ambulance> getNextAvailableAmbulance() {
-        logger.debug("Starting getNextAvailableAmbulance. Queue size: {}", availableQueue.size());
-
-        // First try to get from queue
-        Ambulance ambulance = availableQueue.poll();
-        while (ambulance != null) {
-            try {
-                logger.debug("Processing ambulance ID: {}", ambulance.getId());
-
-                // Re-check against database for the most current status with PESSIMISTIC_WRITE lock
-                Optional<Ambulance> currentOpt = ambulanceRepository.findByIdWithPessimisticWriteLock(ambulance.getId());
-
-                if (currentOpt.isPresent()) {
-                    Ambulance current = currentOpt.get();
-
-                    if (current.getAvailability() == AvailabilityStatus.AVAILABLE) {
-                        // Update status to DISPATCHED
-                        current.setAvailability(AvailabilityStatus.DISPATCHED);
-                        Ambulance updated = ambulanceRepository.save(current);
-
-                        // Update cache
-                        updateCacheAndQueue(updated);
-                        logger.info("Successfully dispatched ambulance: {}", current.getId());
-                        return Optional.of(updated);
-                    } else {
-                        logger.debug("Ambulance {} no longer available (status: {})",
-                                current.getId(), current.getAvailability());
-                    }
-                }
-
-                // Get next ambulance
-                ambulance = availableQueue.poll();
-
-            } catch (ObjectOptimisticLockingFailureException e) {
-                logger.warn("Optimistic lock failure while processing ambulance {}, trying next",
-                    ambulance != null ? ambulance.getId() : "null");
-                // Try next ambulance
-                ambulance = availableQueue.poll();
-            } catch (Exception e) {
-                logger.error("Error processing ambulance {}: {}",
-                        ambulance != null ? ambulance.getId() : "null", e.getMessage(), e);
-                // Move to next ambulance
-                ambulance = availableQueue.poll();
-            }
-        }
-
-        // If we get here, no available ambulances in queue, try database directly
-        try {
-            // Try to find an available ambulance with PESSIMISTIC_WRITE lock
-            Optional<Ambulance> availableAmbulance = ambulanceRepository
-                    .findFirstByAvailabilityWithPessimisticWriteLock(AvailabilityStatus.AVAILABLE);
-
-            if (availableAmbulance.isPresent()) {
-                Ambulance dbAmbulance = availableAmbulance.get();
-                dbAmbulance.setAvailability(AvailabilityStatus.DISPATCHED);
-                Ambulance updated = ambulanceRepository.save(dbAmbulance);
-                updateCacheAndQueue(updated);
-                logger.info("Found and dispatched available ambulance from database: {}", updated.getId());
-                return Optional.of(updated);
-            }
-        } catch (Exception e) {
-            logger.error("Error finding available ambulance from database: {}", e.getMessage(), e);
-        }
-
-        logger.warn("No available ambulances found");
-        return Optional.empty();
-    }
-
-    @Override
     public long countAllAmbulances() {
-        return ambulanceCache.size();
+        try {
+            return ambulanceRepository.count();
+        } catch (Exception e) {
+            logger.error("Error counting all ambulances: {}", e.getMessage(), e);
+            return ambulanceCache.size(); // Fallback to cache size
+        }
     }
 
     @Override
     public long countAmbulancesByStatus(AvailabilityStatus status) {
-        return ambulanceCache.values().stream()
-                .filter(a -> a.getAvailability() == status)
+        if (status == null) {
+            return 0;
+        }
+        
+        try {
+            return ambulanceRepository.countByAvailability(status);
+        } catch (Exception e) {
+            logger.error("Error counting ambulances by status {}: {}", status, e.getMessage(), e);
+            // Fallback to counting in cache
+            return ambulanceCache.values().stream()
+                .filter(a -> status.equals(a.getAvailability()))
                 .count();
+        }
     }
 
     @Override
     public boolean deleteAmbulance(Long id) {
-        return ambulanceRepository.findById(id)
-                .map(ambulance -> {
-                    if (ambulance.isDeleted()) {
-                        return false; // Already deleted
-                    }
-                    ambulance.setDeleted(true);
-                    ambulanceRepository.save(ambulance);
-                    
-                    // Update cache
-                    ambulanceCache.remove(id);
-                    availableQueue.removeIf(a -> a.getId().equals(id));
-                    
-                    return true;
-                })
-                .orElse(false);
+        if (id == null) {
+            return false;
+        }
+
+        try {
+            Optional<Ambulance> ambulanceOpt = ambulanceRepository.findById(id);
+            if (ambulanceOpt.isEmpty()) {
+                return false;
+            }
+            
+            // Soft delete
+            Ambulance ambulance = ambulanceOpt.get();
+            ambulance.setDeleted(true);
+            ambulance.setDeletedAt(LocalDateTime.now());
+            ambulanceRepository.save(ambulance);
+            
+            // Update cache
+            ambulanceCache.remove(id);
+            availableQueue.removeIf(a -> a.getId().equals(id));
+            
+            logger.info("Soft deleted ambulance with ID: {}", id);
+            return true;
+            
+        } catch (Exception e) {
+            logger.error("Error deleting ambulance with ID {}: {}", id, e.getMessage(), e);
+            return false;
+        }
     }
 
     @Override
     public Optional<Ambulance> updateAmbulance(Long id, Ambulance ambulanceDetails) {
-        return ambulanceRepository.findById(id)
-                .map(existingAmbulance -> {
-                    // Only update non-null fields from ambulanceDetails
-                    if (ambulanceDetails.getCurrentLocation() != null) {
-                        existingAmbulance.setCurrentLocation(ambulanceDetails.getCurrentLocation());
-                    }
-                    
-                    if (ambulanceDetails.getAvailability() != null) {
-                        existingAmbulance.setAvailability(ambulanceDetails.getAvailability());
-                        // Update queue if availability changed
-                        if (ambulanceDetails.getAvailability() == AvailabilityStatus.AVAILABLE) {
-                            if (!availableQueue.contains(existingAmbulance)) {
-                                availableQueue.offer(existingAmbulance);
-                            }
-                        } else {
-                            availableQueue.removeIf(a -> a.getId().equals(id));
-                        }
-                    }
-                    
-                    if (ambulanceDetails.getLicensePlate() != null) {
-                        existingAmbulance.setLicensePlate(ambulanceDetails.getLicensePlate());
-                    }
-                    
-                    if (ambulanceDetails.getDriverName() != null) {
-                        existingAmbulance.setDriverName(ambulanceDetails.getDriverName());
-                    }
-                    
-                    if (ambulanceDetails.getDriverContact() != null) {
-                        existingAmbulance.setDriverContact(ambulanceDetails.getDriverContact());
-                    }
-                    
-                    if (ambulanceDetails.getModel() != null) {
-                        existingAmbulance.setModel(ambulanceDetails.getModel());
-                    }
-                    
-                    if (ambulanceDetails.getYear() != null) {
-                        existingAmbulance.setYear(ambulanceDetails.getYear());
-                    }
-                    
-                    if (ambulanceDetails.getCapacity() != null) {
-                        existingAmbulance.setCapacity(ambulanceDetails.getCapacity());
-                    }
-                    
-                    Ambulance updatedAmbulance = ambulanceRepository.save(existingAmbulance);
-                    
-                    // Update cache
-                    ambulanceCache.put(updatedAmbulance.getId(), updatedAmbulance);
-                    
-                    return updatedAmbulance;
-                });
+        if (id == null || ambulanceDetails == null) {
+            return Optional.empty();
+        }
+
+        try {
+            return ambulanceRepository.findById(id).map(ambulance -> {
+                // Update fields
+                if (ambulanceDetails.getCurrentLocation() != null) {
+                    ambulance.setCurrentLocation(ambulanceDetails.getCurrentLocation());
+                }
+                if (ambulanceDetails.getAvailability() != null) {
+                    ambulance.setAvailability(ambulanceDetails.getAvailability());
+                }
+                if (ambulanceDetails.getLicensePlate() != null) {
+                    ambulance.setLicensePlate(ambulanceDetails.getLicensePlate());
+                }
+                if (ambulanceDetails.getDriverName() != null) {
+                    ambulance.setDriverName(ambulanceDetails.getDriverName());
+                }
+                if (ambulanceDetails.getDriverContact() != null) {
+                    ambulance.setDriverContact(ambulanceDetails.getDriverContact());
+                }
+                if (ambulanceDetails.getModel() != null) {
+                    ambulance.setModel(ambulanceDetails.getModel());
+                }
+                if (ambulanceDetails.getYear() != null) {
+                    ambulance.setYear(ambulanceDetails.getYear());
+                }
+                if (ambulanceDetails.getCapacity() != null) {
+                    ambulance.setCapacity(ambulanceDetails.getCapacity());
+                }
+
+                Ambulance updatedAmbulance = ambulanceRepository.save(ambulance);
+                updateCacheAndQueue(updatedAmbulance);
+                logger.info("Updated ambulance with ID: {}", id);
+                return updatedAmbulance;
+            });
+        } catch (Exception e) {
+            logger.error("Error updating ambulance with ID {}: {}", id, e.getMessage(), e);
+            return Optional.empty();
+        }
     }
 
     @Override
     public Ambulance createAmbulance(Ambulance ambulance) {
-        // Set default values if not provided
-        if (ambulance.getAvailability() == null) {
-            ambulance.setAvailability(AvailabilityStatus.AVAILABLE);
+        if (ambulance == null) {
+            throw new IllegalArgumentException("Ambulance cannot be null");
         }
-        
-        // Save the new ambulance
-        Ambulance savedAmbulance = ambulanceRepository.save(ambulance);
-        
-        // Update cache
-        ambulanceCache.put(savedAmbulance.getId(), savedAmbulance);
-        if (savedAmbulance.getAvailability() == AvailabilityStatus.AVAILABLE) {
-            availableQueue.offer(savedAmbulance);
+
+        try {
+            // Set default availability if not provided
+            if (ambulance.getAvailability() == null) {
+                ambulance.setAvailability(AvailabilityStatus.AVAILABLE);
+            }
+
+            Ambulance savedAmbulance = ambulanceRepository.save(ambulance);
+            updateCacheAndQueue(savedAmbulance);
+            
+            logger.info("Created new ambulance with ID: {}", savedAmbulance.getId());
+            return savedAmbulance;
+        } catch (Exception e) {
+            logger.error("Error creating ambulance: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to create ambulance", e);
         }
-        
-        return savedAmbulance;
     }
 
     @Override
     public Optional<Ambulance> findByLicensePlateIncludingDeleted(String licensePlate) {
-        return ambulanceRepository.findByLicensePlate(licensePlate);
-    }
+        if (licensePlate == null || licensePlate.trim().isEmpty()) {
+            return Optional.empty();
+        }
 
-    public interface AmbulanceServiceInterface {
-        List<Ambulance> getAllAmbulances();
-        Optional<Ambulance> getAmbulanceById(Long id);
-        Ambulance saveAmbulance(Ambulance ambulance);
-        void updateAmbulanceStatus(Long ambulanceId, AvailabilityStatus newStatus);
-        List<Ambulance> getAvailableAmbulances();
-        Optional<Ambulance> getNextAvailableAmbulance();
-        long countAllAmbulances();
-        long countAmbulancesByStatus(AvailabilityStatus status);
-        boolean deleteAmbulance(Long id);
-        Optional<Ambulance> updateAmbulance(Long id, Ambulance ambulanceDetails);
-        Ambulance createAmbulance(Ambulance ambulance);
-        Optional<Ambulance> findByLicensePlateIncludingDeleted(String licensePlate);
+        try {
+            // First check the cache
+            Optional<Ambulance> cachedAmbulance = ambulanceCache.values().stream()
+                .filter(a -> licensePlate.equalsIgnoreCase(a.getLicensePlate()))
+                .findFirst();
+
+            if (cachedAmbulance.isPresent()) {
+                return cachedAmbulance;
+            }
+
+            // If not in cache, check the database
+            return ambulanceRepository.findByLicensePlate(licensePlate);
+        } catch (Exception e) {
+            logger.error("Error finding ambulance by license plate {}: {}", licensePlate, e.getMessage(), e);
+            return Optional.empty();
+        }
     }
 }

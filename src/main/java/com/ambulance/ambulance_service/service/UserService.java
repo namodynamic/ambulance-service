@@ -1,7 +1,6 @@
 package com.ambulance.ambulance_service.service;
 
 import com.ambulance.ambulance_service.dto.UserDto;
-import com.ambulance.ambulance_service.entity.User;
 
 import java.util.List;
 

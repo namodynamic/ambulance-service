@@ -2,10 +2,12 @@ package com.ambulance.ambulance_service.service;
 
 import com.ambulance.ambulance_service.entity.Patient;
 import com.ambulance.ambulance_service.repository.PatientRepository;
+import com.ambulance.ambulance_service.repository.ServiceHistoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,10 +15,13 @@ import java.util.Optional;
 public class PatientService implements PatientServiceInterface<Patient> {
 
     private final PatientRepository patientRepository;
+    private final ServiceHistoryRepository serviceHistoryRepository;
 
     @Autowired
-    public PatientService(PatientRepository patientRepository) {
+    public PatientService(PatientRepository patientRepository,
+                          ServiceHistoryRepository serviceHistoryRepository) {
         this.patientRepository = patientRepository;
+        this.serviceHistoryRepository = serviceHistoryRepository;
     }
 
     @Override
@@ -116,9 +121,23 @@ public class PatientService implements PatientServiceInterface<Patient> {
                         return false; // Already deleted
                     }
                     patient.setDeleted(true);
+                    patient.setDeletedAt(LocalDateTime.now());
                     patientRepository.save(patient);
                     return true;
                 })
                 .orElse(false);
+    }
+
+    public boolean permanentlyDeletePatient(Long id) {
+        if (id == null ) return false;
+        if (serviceHistoryRepository.existsByPatientId(id)) {
+            throw new IllegalArgumentException("Cannot delete patient: referenced by service history");
+        }
+        try {
+            patientRepository.deleteById(id);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

@@ -16,6 +16,10 @@ public interface ServiceHistoryRepository extends JpaRepository<ServiceHistory, 
     List<ServiceHistory> findByStatus(ServiceStatus status);
     List<ServiceHistory> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
+    List<ServiceHistory> findByPatientId(Long patientId);
+
+    boolean existsByPatientId(Long patientId);
+
     @Query("SELECT sh FROM ServiceHistory sh JOIN sh.request r WHERE r.userContact = :contact")
     List<ServiceHistory> findByPatientContact(String contact);
     List<ServiceHistory> findByRequestId(Long requestId);

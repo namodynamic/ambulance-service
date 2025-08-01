@@ -1,6 +1,7 @@
 package com.ambulance.ambulance_service.controller;
 
 import com.ambulance.ambulance_service.dto.ServiceHistoryDTO;
+import com.ambulance.ambulance_service.exception.EntityNotFoundException;
 import com.ambulance.ambulance_service.exception.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -69,5 +70,31 @@ public class ServiceHistoryController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         return serviceHistoryService.getServiceHistoryByDateRange(start, end);
+    }
+
+    @PatchMapping("/service-history/{id}/status")
+    public ResponseEntity<?> updateServiceHistoryStatus(
+            @PathVariable Long id,
+            @RequestBody ServiceHistoryStatusUpdateRequest request) {
+        try {
+            serviceHistoryService.updateStatusAndSync(id, request.getStatus(), request.getNotes());
+            return ResponseEntity.ok().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update status");
+        }
+    }
+
+    // DTO for PATCH body
+    public static class ServiceHistoryStatusUpdateRequest {
+        private String status;
+        private String notes;
+
+        // getters/setters
+        public String getStatus() { return status; }
+        public String getNotes() { return notes; }
     }
 }

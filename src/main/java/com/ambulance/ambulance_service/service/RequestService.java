@@ -7,6 +7,7 @@ import com.ambulance.ambulance_service.exception.RequestNotFoundException;
 import com.ambulance.ambulance_service.repository.RequestRepository;
 import com.ambulance.ambulance_service.repository.RequestStatusHistoryRepository;
 import com.ambulance.ambulance_service.repository.ServiceHistoryRepository;
+import org.springframework.context.annotation.Lazy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +45,7 @@ public class RequestService implements RequestServiceInterface {
     private ServiceHistoryService serviceHistoryService;
 
     @Autowired
+    @Lazy
     private ServiceHistoryRepository serviceHistoryRepository;
 
     @Autowired
@@ -312,7 +314,6 @@ public class RequestService implements RequestServiceInterface {
             } catch (Exception e) {
                 logger.error("Error processing queued request ID: {}: {}", 
                     request.getId(), e.getMessage(), e);
-                // Continue with next request on error
             }
         }
     }
@@ -327,7 +328,6 @@ public class RequestService implements RequestServiceInterface {
         } catch (Exception e) {
             logger.error("Failed to update service history for request {}: {}",
                     request.getId(), e.getMessage(), e);
-            // Consider whether to rethrow or handle differently based on your requirements
         }
     }
 
@@ -449,7 +449,7 @@ public class RequestService implements RequestServiceInterface {
      * @param newStatus The new status
      * @param notes Additional notes about the status change
      */
-    private void saveStatusHistory(Request request, RequestStatus oldStatus, RequestStatus newStatus, String notes) {
+    public void saveStatusHistory(Request request, RequestStatus oldStatus, RequestStatus newStatus, String notes) {
         RequestStatusHistory history = new RequestStatusHistory();
         history.setRequest(request);
         history.setOldStatus(oldStatus);
@@ -640,7 +640,7 @@ public class RequestService implements RequestServiceInterface {
         return requestRepository.findById(id)
                 .map(request -> {
                     if (!request.isDeleted()) {
-                        return false; // Not deleted, nothing to restore
+                        return false;
                     }
                     request.setDeleted(false);
                     request.setDeletedAt(null);
@@ -672,14 +672,13 @@ public class RequestService implements RequestServiceInterface {
 
         // If request is not already in progress, update its status
         if (request.getStatus() != RequestStatus.IN_PROGRESS) {
-            // Use the standard status update method to maintain consistency
             updateRequestStatus(
                     requestId,
                     RequestStatus.IN_PROGRESS,
                     "Ambulance arrived at location: " + (notes != null ? notes : "")
             );
         } else {
-            // Just save the request to ensure service history is persisted
+            // save the request to ensure service history is persisted
             requestRepository.save(request);
         }
     }

@@ -1,7 +1,6 @@
 package com.ambulance.ambulance_service.controller;
 
 import com.ambulance.ambulance_service.dto.UserDto;
-import com.ambulance.ambulance_service.entity.User;
 import com.ambulance.ambulance_service.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

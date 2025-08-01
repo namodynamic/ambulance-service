@@ -1,28 +1,29 @@
 package com.ambulance.ambulance_service.controller;
 
 import com.ambulance.ambulance_service.dto.AdminDashboardStats;
-import com.ambulance.ambulance_service.entity.Ambulance;
-import com.ambulance.ambulance_service.entity.AvailabilityStatus;
-import com.ambulance.ambulance_service.entity.Patient;
-import com.ambulance.ambulance_service.entity.Request;
+import com.ambulance.ambulance_service.entity.*;
+import com.ambulance.ambulance_service.exception.EntityNotFoundException;
+import com.ambulance.ambulance_service.repository.PatientRepository;
+import com.ambulance.ambulance_service.repository.ServiceHistoryRepository;
+import com.ambulance.ambulance_service.repository.UserRepository;
 import com.ambulance.ambulance_service.service.AmbulanceService;
 import com.ambulance.ambulance_service.service.PatientService;
 import com.ambulance.ambulance_service.service.RequestService;
+import com.ambulance.ambulance_service.service.ServiceHistoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import com.ambulance.ambulance_service.entity.RequestStatus;
 import com.ambulance.ambulance_service.exception.RequestNotFoundException;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
+import com.ambulance.ambulance_service.dto.RequestDTO;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -32,14 +33,26 @@ public class AdminController {
     private final RequestService requestService;
     private final AmbulanceService ambulanceService;
     private final PatientService patientService;
+    private final UserRepository userRepository;
+    private final PatientRepository patientRepository;
+    private final ServiceHistoryRepository serviceHistoryRepository;
+    private final ServiceHistoryService serviceHistoryService;
 
     @Autowired
     public AdminController(RequestService requestService,
                           AmbulanceService ambulanceService,
+                           UserRepository userRepository,
+                           PatientRepository patientRepository,
+                           ServiceHistoryRepository serviceHistoryRepository,
+                           ServiceHistoryService serviceHistoryService,
                           PatientService patientService) {
         this.requestService = requestService;
         this.ambulanceService = ambulanceService;
         this.patientService = patientService;
+        this.userRepository = userRepository;
+        this.patientRepository = patientRepository;
+        this.serviceHistoryRepository = serviceHistoryRepository;
+        this.serviceHistoryService = serviceHistoryService;
     }
 
     @GetMapping("/dashboard")
@@ -108,7 +121,7 @@ public class AdminController {
     @PutMapping("/requests/{id}")
     public ResponseEntity<?> updateRequest(@PathVariable Long id,
                                            @RequestBody Request requestDetails) {
-        // Ensure the ID in the path matches the ID in the request body if provided
+        // Ensures the ID in the path matches the ID in the request body if provided
         if (requestDetails.getId() != null && !requestDetails.getId().equals(id)) {
             return ResponseEntity.badRequest().body("ID in path does not match ID in request body");
         }
@@ -158,6 +171,16 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/users/{userId}/requests")
+    public ResponseEntity<?> getRequestsByUserId(@PathVariable Long userId) {
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        List<Request> requests = requestService.getRequestsByUser(userOpt.get());
+        return ResponseEntity.ok(requests);
+    }
+
     @GetMapping("/ambulances")
     public ResponseEntity<List<Ambulance>> getAllAmbulances() {
         return ResponseEntity.ok(ambulanceService.getAllAmbulances());
@@ -186,9 +209,9 @@ public class AdminController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PutMapping("/ambulances/{id}")
+    @PatchMapping("/ambulances/{id}")
     public ResponseEntity<?> updateAmbulance(@PathVariable Long id, @RequestBody Ambulance ambulanceDetails) {
-        // Ensure the ID in the path matches the ID in the request body if provided
+        // Ensures the ID in the path matches the ID in the request body if provided
         if (ambulanceDetails.getId() != null && !ambulanceDetails.getId().equals(id)) {
             return ResponseEntity.badRequest().body("ID in path does not match ID in request body");
         }
@@ -221,7 +244,7 @@ public class AdminController {
         return ResponseEntity.ok(patientService.getAllPatients());
     }
 
-    @DeleteMapping("/patients/{id}")
+    @DeleteMapping("/patients/{id}/soft-delete")
     public ResponseEntity<?> deletePatient(@PathVariable Long id) {
         boolean deleted = patientService.deletePatient(id);
         if (deleted) {
@@ -231,9 +254,33 @@ public class AdminController {
         }
     }
 
+    @DeleteMapping("/patients/{id}")
+    public ResponseEntity<?> permanentlyDeletePatient(@PathVariable Long id) {
+        try {
+            boolean deleted = patientService.permanentlyDeletePatient(id);
+            if (deleted) {
+                return ResponseEntity.noContent().build();
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/patients/{patientId}/requests")
+    public ResponseEntity<?> getRequestsByPatientId(@PathVariable Long patientId) {
+        List<ServiceHistory> histories = serviceHistoryRepository.findByPatientId(patientId);
+        List<RequestDTO> requests = histories.stream()
+                .map(ServiceHistory::getRequest)
+                .map(RequestDTO::new)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(requests);
+    }
+
     @PutMapping("/patients/{id}")
     public ResponseEntity<?> updatePatient(@PathVariable Long id, @RequestBody Patient patientDetails) {
-        // Ensure the ID in the path matches the ID in the request body if provided
+        // Ensures the ID in the path matches the ID in the request body if provided
         if (patientDetails.getId() != null && !patientDetails.getId().equals(id)) {
             return ResponseEntity.badRequest().body("ID in path does not match ID in request body");
         }
@@ -241,5 +288,39 @@ public class AdminController {
         return patientService.updatePatient(id, patientDetails)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PatchMapping("/service-history/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> adminUpdateServiceHistoryStatus(
+            @PathVariable Long id,
+            @RequestBody ServiceHistoryController.ServiceHistoryStatusUpdateRequest request) {
+        try {
+            serviceHistoryService.updateStatusAndSync(id, request.getStatus(), request.getNotes());
+            return ResponseEntity.ok().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update status");
+        }
+    }
+
+    @PostMapping("/service-history/{id}/complete")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> completeServiceHistory(
+            @PathVariable Long id,
+            @RequestParam(required = false) String notes) {
+        try {
+            serviceHistoryService.updateStatusAndSync(id, "COMPLETED", notes);
+            return ResponseEntity.ok().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to complete service");
+        }
     }
 }
