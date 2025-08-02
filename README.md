@@ -153,3 +153,74 @@ The frontend is a separate React application. You can access the live version at
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🚀 Deployment
+
+This application is configured for deployment on [Render](https://render.com/). Follow these steps to deploy:
+
+### Prerequisites
+- A Render account
+- GitHub/GitLab account with access to this repository
+- (Optional) A custom domain (if you want to use your own domain)
+
+### Deploy to Render
+
+1. **Fork this repository** to your GitHub/GitLab account
+
+2. **Sign in to Render**
+   - Go to [Render Dashboard](https://dashboard.render.com/)
+   - Click "New +" and select "Blueprint"
+   - Connect your GitHub/GitLab account if you haven't already
+
+3. **Configure your repository**
+   - Select the forked repository
+   - Give your service a name (e.g., "ambulance-service")
+   - Select the branch you want to deploy (usually `main` or `master`)
+   - Click "Apply"
+
+4. **Configure environment variables**
+   - Go to the "Environment" tab in your Render dashboard
+   - Add the following environment variables:
+     - `SPRING_PROFILES_ACTIVE=production`
+     - `JWT_SECRET` (generate a strong secret key)
+     - `JWT_EXPIRATION=86400000` (24 hours in milliseconds)
+   - The database credentials will be automatically injected by Render
+
+5. **Start the deployment**
+   - Click "Save Changes"
+   - Go to the "Manual Deploy" tab and click "Deploy latest commit"
+
+6. **Wait for deployment to complete**
+   - The build and deployment process will start automatically
+   - You can monitor the progress in the logs
+
+7. **Access your application**
+   - Once deployed, you'll get a URL like `https://your-service-name.onrender.com`
+   - The API will be available at the root path (e.g., `https://your-service-name.onrender.com/api/ambulances`)
+
+### Environment Variables
+
+For local development, create a `.env` file in the root directory with the following variables:
+
+```
+DB_URL=jdbc:postgresql://localhost:5432/ambulance_service
+DB_USERNAME=your_username
+DB_PASSWORD=your_password
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRATION=86400000
+```
+
+### Production Configuration
+
+In production (on Render), the following configurations are automatically applied:
+- Database is provisioned and managed by Render
+- HTTPS is automatically configured
+- Automatic deployments on push to the main branch
+- Health checks and auto-restart on failure
+
+### Custom Domain (Optional)
+
+To use a custom domain:
+1. Go to your service in the Render dashboard
+2. Click on "Settings" > "Custom Domains"
+3. Add your domain and follow the DNS configuration instructions

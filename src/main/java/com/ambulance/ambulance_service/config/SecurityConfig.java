@@ -41,7 +41,7 @@ public class SecurityConfig {
     @Value("${security.bcrypt.strength:12}")
     private int bcryptStrength;
 
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,https://ambulance-service-provider-ui.vercel.app}")
     private List<String> allowedOrigins;
 
     // Add this constant for Swagger whitelist
@@ -80,9 +80,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Use allowedOriginPatterns instead of allowedOrigins
+        // Set allowed origins from configuration
         configuration.setAllowedOriginPatterns(allowedOrigins);
 
+        // Allow all necessary HTTP methods
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"
         ));
@@ -103,7 +104,10 @@ public class SecurityConfig {
                 "Access-Control-Allow-Credentials"
         ));
 
+        // Allow credentials (cookies, authorization headers)
         configuration.setAllowCredentials(true);
+
+        // Cache preflight requests for 1 hour
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -117,9 +121,11 @@ public class SecurityConfig {
     public SecurityFilterChain swaggerSecurityFilterChain(HttpSecurity http) throws Exception {
         return http
             .securityMatcher(
-                "/v3/api-docs/**",
-                "/swagger-ui/**",
-                "/swagger-ui.html"
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/swagger-resources/**",
+                    "/webjars/**"
             )
             .authorizeHttpRequests(auth -> auth
                 .anyRequest().permitAll()

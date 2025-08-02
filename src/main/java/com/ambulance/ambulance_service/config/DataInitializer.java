@@ -18,10 +18,10 @@ import java.time.LocalDateTime;
 
 /**
  * DataInitializer populates the database with initial test data.
- * This will only run in the 'dev' or 'test' profiles.
+ * This will run in 'dev', 'test', and 'prod' profiles.
  */
 @Component
-@Profile({"dev", "test"})
+@Profile({"dev", "test", "prod"})
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;

@@ -1,0 +1,54 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VSCode
+.vscode/
+
+# Logs
+logs/
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build output
+build/
+
+# Environment files (except production)
+.env*
+!.env.production
+
+# Git
+.git/
+.gitignore
+
+# Node (if any node_modules exist)
+node_modules/
+
+# Test files
+*.test
+*.spec
+
+# Local development files
+*.swp
+*.swo
+*~
+
+# Docker compose files (if any)
+docker-compose*.yml
+
+# Render specific
+.render/
