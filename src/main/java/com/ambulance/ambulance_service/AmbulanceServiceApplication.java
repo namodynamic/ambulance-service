@@ -16,11 +16,24 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 public class AmbulanceServiceApplication {
 
     public static void main(String[] args) {
-        // Load .env file before Spring starts
-        io.github.cdimascio.dotenv.Dotenv dotenv = io.github.cdimascio.dotenv.Dotenv.configure().load();
-        dotenv.entries().forEach(e -> System.setProperty(e.getKey(), e.getValue()));
+        // Only load .env file in development
+        if (System.getenv("SPRING_PROFILES_ACTIVE") == null ||
+                !System.getenv("SPRING_PROFILES_ACTIVE").equals("production")) {
+            try {
+                io.github.cdimascio.dotenv.Dotenv dotenv = io.github.cdimascio.dotenv.Dotenv.configure().load();
+                dotenv.entries().forEach(e -> {
+                    if (System.getProperty(e.getKey()) == null) {
+                        System.setProperty(e.getKey(), e.getValue());
+                    }
+                });
+            } catch (Exception e) {
+                System.out.println("No .env file found, using system environment variables");
+            }
+        }
+
         SpringApplication.run(AmbulanceServiceApplication.class, args);
     }
+
 
     @Bean
     public AuditorAware<String> securityAuditorAware() {
