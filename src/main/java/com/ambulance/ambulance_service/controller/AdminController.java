@@ -10,6 +10,7 @@ import com.ambulance.ambulance_service.service.AmbulanceService;
 import com.ambulance.ambulance_service.service.PatientService;
 import com.ambulance.ambulance_service.service.RequestService;
 import com.ambulance.ambulance_service.service.ServiceHistoryService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,11 +21,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import com.ambulance.ambulance_service.dto.RequestDTO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.Parameter;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Tag(name = "Admin", description = "Admin management APIs")
 @RestController
 @RequestMapping("/api/admin")
 @PreAuthorize("hasRole('ADMIN')")
@@ -181,10 +187,23 @@ public class AdminController {
         return ResponseEntity.ok(requests);
     }
 
+    @Operation(summary = "Get all ambulances",
+            description = "Retrieves a paginated list of all ambulances with optional filtering")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved list"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - authentication required"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - admin access required")
+    })
+
     @GetMapping("/ambulances")
-    public ResponseEntity<List<Ambulance>> getAllAmbulances() {
+    public ResponseEntity<List<Ambulance>> getAllAmbulances(
+            @Parameter(description = "Page number (0-based)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Number of items per page", example = "10")
+            @RequestParam(defaultValue = "10") int size)                          {
         return ResponseEntity.ok(ambulanceService.getAllAmbulances());
     }
+
 
     @PostMapping("/ambulances")
     public ResponseEntity<Ambulance> createAmbulance(@RequestBody Ambulance ambulance) {

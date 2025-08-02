@@ -166,6 +166,13 @@ public class RequestService implements RequestServiceInterface {
             request = requestRepository.save(request);
             saveStatusHistory(request, oldStatus, RequestStatus.PENDING, 
                 "No ambulances available, request queued");
+            
+            // Create service history with PENDING status even when no ambulance is available
+            ServiceHistory serviceHistory = serviceHistoryService.createServiceHistory(request, patient, null);
+            serviceHistory.setStatus(ServiceStatus.PENDING);
+            serviceHistory.setNotes("Request queued - waiting for ambulance availability");
+            serviceHistoryRepository.save(serviceHistory);
+            
             return request;
         }
     }

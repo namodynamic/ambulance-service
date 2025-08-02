@@ -43,6 +43,20 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}")
     private List<String> allowedOrigins;
 
+    // Add this constant for Swagger whitelist
+    private static final String[] SWAGGER_WHITELIST = {
+        "/v2/api-docs",
+        "/v3/api-docs",
+        "/v3/api-docs/**",
+        "/swagger-resources",
+        "/swagger-resources/**",
+        "/configuration/ui",
+        "/configuration/security",
+        "/swagger-ui/**",
+        "/swagger-ui.html",
+        "/webjars/**"
+    };
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(bcryptStrength);
@@ -96,6 +110,24 @@ public class SecurityConfig {
         return source;
     }
 
+    // Add this new method for Swagger UI security configuration
+    @Bean
+    @Order(0) // This will make this filter chain run first
+    public SecurityFilterChain swaggerSecurityFilterChain(HttpSecurity http) throws Exception {
+        return http
+            .securityMatcher(
+                "/v3/api-docs/**",
+                "/swagger-ui/**",
+                "/swagger-ui.html"
+            )
+            .authorizeHttpRequests(auth -> auth
+                .anyRequest().permitAll()
+            )
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .build();
+    }
+
     @Bean
     @Order(1)
     public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -121,15 +153,6 @@ public class SecurityConfig {
                                 "/api/requests/{id}",
                                 "/api/requests/{id}/status",
                                 "/api/requests/{id}/history"
-                        ).permitAll()
-
-                        // Swagger/OpenAPI documentation (if enabled)
-                        .requestMatchers(
-                                "/swagger-ui/**",
-                                "/api-docs/**",
-                                "/v3/api-docs/**",
-                                "/swagger-resources/**",
-                                "/webjars/**"
                         ).permitAll()
 
                         // User-specific endpoints

@@ -69,7 +69,7 @@ class AmbulanceServiceTest {
     void testAmbulanceQueueInitialization() {
         // Arrange
         List<Ambulance> availableAmbulances = Arrays.asList(availableAmbulance1, availableAmbulance2);
-        when(ambulanceRepository.findAll()).thenReturn(availableAmbulances);
+        when(ambulanceRepository.findByDeletedFalse()).thenReturn(availableAmbulances);
         when(ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE))
                 .thenReturn(availableAmbulances);
 
@@ -84,7 +84,7 @@ class AmbulanceServiceTest {
         assertTrue(available.stream().anyMatch(a -> a.getId().equals(1L)), "Should contain ambulance 1");
         assertTrue(available.stream().anyMatch(a -> a.getId().equals(2L)), "Should contain ambulance 2");
 
-        verify(ambulanceRepository, times(1)).findAll();
+        verify(ambulanceRepository, times(1)).findByDeletedFalse();
         verify(ambulanceRepository, times(1)).findByAvailability(AvailabilityStatus.AVAILABLE);
     }
 
@@ -94,15 +94,13 @@ class AmbulanceServiceTest {
         List<Ambulance> availableAmbulances = Arrays.asList(availableAmbulance1, availableAmbulance2);
 
         // Mock database responses
-        when(ambulanceRepository.findAll()).thenReturn(availableAmbulances);
+        when(ambulanceRepository.findByDeletedFalse()).thenReturn(availableAmbulances);
         when(ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE))
                 .thenReturn(availableAmbulances);
 
-        // Mock findByIdWithPessimisticWriteLock to return the ambulances
-        when(ambulanceRepository.findByIdWithPessimisticWriteLock(1L))
-                .thenReturn(Optional.of(availableAmbulance1));
-        when(ambulanceRepository.findByIdWithPessimisticWriteLock(2L))
-                .thenReturn(Optional.of(availableAmbulance2));
+        // Mock findById to return the ambulances for status updates
+        when(ambulanceRepository.findById(1L)).thenReturn(Optional.of(availableAmbulance1));
+        when(ambulanceRepository.findById(2L)).thenReturn(Optional.of(availableAmbulance2));
 
         // Mock save to update status
         when(ambulanceRepository.save(any(Ambulance.class))).thenAnswer(invocation -> {
@@ -166,19 +164,8 @@ class AmbulanceServiceTest {
     @Test
     void testGetAvailableAmbulances_FiltersCorrectly() {
         // Arrange
-        List<Ambulance> allAmbulances = Arrays.asList(
-                availableAmbulance1,
-                availableAmbulance2,
-                dispatchedAmbulance,
-                maintenanceAmbulance
-        );
-
-        when(ambulanceRepository.findAll()).thenReturn(allAmbulances);
         when(ambulanceRepository.findByAvailability(AvailabilityStatus.AVAILABLE))
                 .thenReturn(Arrays.asList(availableAmbulance1, availableAmbulance2));
-
-        // Initialize the service to load ambulances
-        ambulanceService.init();
 
         // Act
         List<Ambulance> result = ambulanceService.getAvailableAmbulances();
@@ -198,6 +185,6 @@ class AmbulanceServiceTest {
         assertFalse(resultIds.contains(maintenanceAmbulance.getId()), "Should not contain ambulance in maintenance");
 
         // Verify repository interactions
-        verify(ambulanceRepository, atLeastOnce()).findByAvailability(AvailabilityStatus.AVAILABLE);
+        verify(ambulanceRepository, times(1)).findByAvailability(AvailabilityStatus.AVAILABLE);
     }
 }

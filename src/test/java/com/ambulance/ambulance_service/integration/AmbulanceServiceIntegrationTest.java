@@ -95,7 +95,7 @@ class AmbulanceServiceIntegrationTest {
         user.setRole(Role.USER);
         user = userRepository.save(user);
 
-        // Create test ambulance
+        // Create test ambulance using the service to ensure cache consistency
         Ambulance ambulance = new Ambulance();
         ambulance.setCurrentLocation("Test Location");
         ambulance.setAvailability(AvailabilityStatus.AVAILABLE);
@@ -103,7 +103,7 @@ class AmbulanceServiceIntegrationTest {
         ambulance.setModel("Test Model");
         ambulance.setYear(2023);
         ambulance.setCapacity(4);
-        ambulance = ambulanceRepository.save(ambulance);
+        ambulance = ambulanceService.saveAmbulance(ambulance); // Use service to ensure cache update
         ambulanceId = ambulance.getId();
         logger.info("Test setup complete");
     }
@@ -117,9 +117,9 @@ class AmbulanceServiceIntegrationTest {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void testCompleteEmergencyWorkflow() throws NoAvailableAmbulanceException {
         logger.info("Running testCompleteEmergencyWorkflow...");
-        // Create and save an ambulance first
+        // Create and save an ambulance first using the service
         Ambulance ambulance = new Ambulance("Test Hospital", AvailabilityStatus.AVAILABLE, "AMB" + System.currentTimeMillis());
-        ambulanceRepository.save(ambulance);
+        ambulance = ambulanceService.saveAmbulance(ambulance);
         
         // Create emergency request
         AmbulanceRequestDto requestDto = new AmbulanceRequestDto(
