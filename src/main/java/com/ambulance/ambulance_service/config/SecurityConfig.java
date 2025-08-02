@@ -24,6 +24,7 @@ import org.springframework.security.web.header.writers.XXssProtectionHeaderWrite
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.http.HttpMethod;
 
 import java.util.Arrays;
 import java.util.List;
@@ -174,6 +175,11 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/admin/**"
                         ).hasRole("ADMIN")
+
+                        // Public GET /api/ambulances endpoint
+                        .requestMatchers(
+                                HttpMethod.GET, "/api/ambulances"
+                        ).permitAll()
 
                         // General ambulance and patient endpoints (admin only)
                         .requestMatchers(
