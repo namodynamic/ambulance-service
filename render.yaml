@@ -1,11 +1,9 @@
 services:
   - type: web
     name: ambulance-service
-    env: java
+    env: docker
     region: oregon
     plan: free
-    buildCommand: ./mvnw clean package -DskipTests
-    dockerfilePath: Dockerfile
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: production
@@ -25,7 +23,8 @@ services:
         generateValue: true
       - key: JWT_EXPIRATION
         value: "86400000"
-
+    dockerContext: .
+    dockerfilePath: Dockerfile
 
 databases:
   - name: ambulance-db
