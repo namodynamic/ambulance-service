@@ -60,7 +60,13 @@ build/
 ### VS Code ###
 .vscode/
 
+# Secret files
+application-secrets.properties.template
+*.secrets.*
+!.secrets.*.template
 .env
+*.env
+!.env.template
 
 # OS
 .DS_Store
