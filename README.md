@@ -21,8 +21,9 @@ To develop a comprehensive web-based system that enables users to request ambula
 
 ## Live Demo
 
-- **Frontend Application**: [Ambulance Service Provider UI](https://ambulance-service-provider-ui.vercel.app/)
-- **API Documentation**: Available at `/swagger-ui.html` when running locally
+- **Frontend Application**: [Ambulance Service Provider UI](https://ambulance-service-frontend.vercel.app/)
+- **Production API**: [https://ambulance-service-nvun.onrender.com/](https://ambulance-service-nvun.onrender.com/)
+- **API Documentation (Swagger UI)**: [View Swagger Documentation](https://ambulance-service-nvun.onrender.com/swagger-ui/index.html#)
 
 ## Technologies
 
@@ -40,7 +41,7 @@ To develop a comprehensive web-based system that enables users to request ambula
 - Secure authentication and authorization
 - RESTful API design
 - Swagger/OpenAPI documentation
-- Clean, responsive frontend (separate repository)
+- Clean, responsive frontend (hosted on Vercel)
 
 ## Prerequisites
 
@@ -127,7 +128,9 @@ To run a specific test method:
 
 ## Frontend
 
-The frontend is a separate React application. You can access the live version at [Ambulance Service Provider UI](https://ambulance-service-provider-ui.vercel.app/).
+The frontend is a separate React application. You can access the live version at [Ambulance Service Provider UI](https://ambulance-service-frontend.vercel.app/).
+
+**Repository**: [GitHub - Ambulance Service Frontend](https://github.com/namodynamic/ambulance-service-frontend)
 
 ## API Endpoints
 
