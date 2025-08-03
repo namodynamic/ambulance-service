@@ -41,7 +41,7 @@ public class SecurityConfig {
     @Value("${security.bcrypt.strength:12}")
     private int bcryptStrength;
 
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,https://ambulance-service-provider-ui.vercel.app}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,https://ambulance-service-provider-ui.vercel.app, https://ambulance-service-frontend.vercel.app}")
     private List<String> allowedOrigins;
 
     // Add this constant for Swagger whitelist
